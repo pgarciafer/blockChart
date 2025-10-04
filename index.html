@@ -1,202 +1,319 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>8-Photo A4 PDF Generator</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Photo Grid with Vessel Blockage Zones</title>
 <style>
-  body {
-    font-family: sans-serif;
-    text-align: center;
-    padding: 20px;
-    background: #f5f5f5;
-  }
+body { font-family: sans-serif; text-align:center; padding:20px; background:#f5f5f5; }
+.card { max-width:950px; margin:auto; background:white; border-radius:12px; padding:18px; }
+#drop-area { border:2px dashed #666; border-radius:10px; padding:20px; background:#fff; margin-bottom:12px; cursor:pointer; }
+#drop-area.highlight { border-color:#2196f3; background:#e3f2fd; }
+#drop-area p { margin:0; }
+#grid { width:720px; height:720px; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:10px; margin:auto; background:white; padding:10px; border-radius:8px; position:relative; }
+.cell { background:#eee; display:flex; justify-content:center; align-items:center; overflow:hidden; position:relative; border-radius:6px; cursor:pointer; }
+.cell img { width:100%; height:100%; object-fit:cover; }
+.center-cell { background:white; position:relative; }
+button { padding:10px 20px; margin-top:10px; }
+table{width:100%; border-collapse:collapse; margin-top:8px;}
+th, td{padding:6px; text-align:center; border-bottom:1px solid #e6eef8;}
+#zonesTable td button{background:#ef4444;color:white;border-radius:4px;border:none;padding:4px 6px;}
+.zone-color{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;}
+.pdfTable { width:60%; border-collapse:collapse; margin: 0 auto 12px; }
+.pdfTable th, .pdfTable td { border:1px solid #aaa; padding:4px; text-align:center; }
 
-  #drop-area {
-    border: 2px dashed #666;
-    border-radius: 10px;
-    padding: 30px;
-    width: 90%;
-    max-width: 500px;
-    margin: 0 auto 20px;
-    background: white;
-    cursor: pointer;
-  }
-
-  #drop-area.highlight {
-    border-color: #2196f3;
-    background: #e3f2fd;
-  }
-
-  #drop-area p {
-    color: #555;
-  }
-
-  #grid {
-    width: 800px;
-    height: 800px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-    gap: 10px;
-    background: white;
-    margin: auto;
-    padding: 10px;
-  }
-
-  .cell {
-    background: #eee;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-  }
-
-  .cell img {
+/* Shadow wrapper */
+.vessel-wrapper {
+    position: relative;
     width: 100%;
     height: 100%;
-    object-fit: cover;
-  }
-
-  #cell-5 {
-    background: white;
-  }
-
-  button {
-    padding: 10px 20px;
-    font-size: 16px;
-    margin-top: 20px;
-  }
+    border-radius: 6px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+.vessel-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    position: absolute;
+    left:0;
+    top:0;
+    z-index:1;
+    border-radius:6px;
+}
+#overlayCanvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; }
 </style>
 </head>
 <body>
+<div class="card">
+  <h1>Photo Grid — Vessel Blockage Zones</h1>
 
-<div id="drop-area">
-  <p>📸 Drop up to 8 photos here or click to browse</p>
-  <input type="file" id="fileElem" accept="image/*" multiple style="display:none">
+  <div style="margin-bottom:12px; text-align:center;">
+    <input id="vesselName" type="text" placeholder="Vessel Name" style="padding:6px 10px; margin-right:8px; width:200px; border-radius:6px; border:1px solid #ccc;">
+    <input id="antennaLocation" type="text" placeholder="Antenna & Location" style="padding:6px 10px; width:250px; border-radius:6px; border:1px solid #ccc;">
+  </div>
+
+  <div class="controls">
+    <div class="panel">
+      <label>Blockage Zones (AZ Start / AZ Stop in degrees)</label>
+      <table id="zonesTable">
+        <thead><tr><th>AZ Start</th><th>AZ Stop</th><th></th></tr></thead>
+        <tbody id="zonesBody"></tbody>
+      </table>
+      <div style="margin-top:8px;font-size:13px;color:#536878">
+        Add zones and they will be drawn over the center vessel. They are also included in the PDF.
+      </div>
+    </div>
+  </div>
+
+  <div id="drop-area">
+    <p>📸 Drop up to 8 photos here or click to browse</p>
+    <input type="file" id="fileElem" accept="image/*" multiple style="display:none">
+  </div>
+
+  <button id="addBlockBtn">Add Blockage Zone</button>
+  <button id="generatePdf">Generate PDF</button>
+
+  <div id="grid">
+    <div class="cell" id="cell-1"></div>
+    <div class="cell" id="cell-2"></div>
+    <div class="cell" id="cell-3"></div>
+    <div class="cell" id="cell-4"></div>
+    <div class="cell center-cell" id="cell-5">
+      <div class="vessel-wrapper">
+        <img id="vesselImage" crossorigin="anonymous" src="https://pgarciafer.github.io/satcalc/IMG_0585.PNG" alt="Vessel">
+        <canvas id="overlayCanvas"></canvas>
+      </div>
+    </div>
+    <div class="cell" id="cell-6"></div>
+    <div class="cell" id="cell-7"></div>
+    <div class="cell" id="cell-8"></div>
+    <div class="cell" id="cell-9"></div>
+  </div>
 </div>
 
-<div id="grid">
-  <div class="cell" id="cell-1"></div>
-  <div class="cell" id="cell-2"></div>
-  <div class="cell" id="cell-3"></div>
-  <div class="cell" id="cell-4"></div>
-  <div class="cell" id="cell-5"><img src="https://pgarciafer.github.io/satcalc/IMG_0585.PNG" alt="Center Logo"></div>
-  <div class="cell" id="cell-6"></div>
-  <div class="cell" id="cell-7"></div>
-  <div class="cell" id="cell-8"></div>
-  <div class="cell" id="cell-9"></div>
-</div>
-
-<button id="generate">Generate PDF</button>
-
-<!-- Dependencies -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-const dropArea = document.getElementById("drop-area");
-const fileInput = document.getElementById("fileElem");
+// --------- Blockage Zones -----------
+const zoneColors = ["rgba(255,0,0,0.45)","rgba(0,128,255,0.45)","rgba(0,200,0,0.45)","rgba(255,165,0,0.45)","rgba(128,0,128,0.45)","rgba(255,20,147,0.45)"];
+const zonesBody=document.getElementById('zonesBody');
+const overlayCanvas=document.getElementById('overlayCanvas');
+const overlayCtx=overlayCanvas.getContext('2d');
+const vesselImg=document.getElementById('vesselImage');
 
-// Drag & Drop handling
-["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
-  dropArea.addEventListener(eventName, e => e.preventDefault(), false);
-  dropArea.addEventListener(eventName, e => e.stopPropagation(), false);
-});
+function formatNumber(num){return(Math.round(num*100)/100).toString().replace(/\.00$/,'');}
 
-["dragenter", "dragover"].forEach(eventName => {
-  dropArea.addEventListener(eventName, () => dropArea.classList.add("highlight"), false);
-});
-
-["dragleave", "drop"].forEach(eventName => {
-  dropArea.addEventListener(eventName, () => dropArea.classList.remove("highlight"), false);
-});
-
-dropArea.addEventListener("drop", handleDrop, false);
-dropArea.addEventListener("click", () => fileInput.click());
-fileInput.addEventListener("change", () => handleFiles(fileInput.files));
-
-function handleDrop(e) {
-  const dt = e.dataTransfer;
-  const files = dt.files;
-  handleFiles(files);
+function resizeOverlay(){
+  const rect = vesselImg.getBoundingClientRect();
+  overlayCanvas.width = rect.width;
+  overlayCanvas.height = rect.height;
+  overlayCanvas.style.width = rect.width + 'px';
+  overlayCanvas.style.height = rect.height + 'px';
+  overlayCtx.setTransform(1,0,0,1,0,0);
+  drawZones();
 }
 
-function handleFiles(files) {
-  const fileArray = Array.from(files).slice(0, 8);
-  fileArray.forEach((file, i) => processImage(file, i));
+function drawZones(){
+  overlayCtx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
+  const cx = overlayCanvas.width/2;
+  const cy = overlayCanvas.height/2;
+  const R = Math.min(overlayCanvas.width, overlayCanvas.height)*0.42;
+
+  Array.from(zonesBody.querySelectorAll('tr')).forEach((row, idx) => {
+    const start = parseFloat(row.cells[0].querySelector('input').value);
+    const stop = parseFloat(row.cells[1].querySelector('input').value);
+    if(isNaN(start)||isNaN(stop)) return;
+    const startRad = (start-90)*Math.PI/180;
+    const stopRad = (stop-90)*Math.PI/180;
+
+    overlayCtx.save();
+    overlayCtx.shadowColor = 'rgba(0,0,0,0.3)';
+    overlayCtx.shadowBlur = 8;
+    overlayCtx.shadowOffsetX = 0;
+    overlayCtx.shadowOffsetY = 0;
+
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(cx,cy);
+    overlayCtx.arc(cx,cy,R,startRad,stopRad,false);
+    overlayCtx.closePath();
+    overlayCtx.fillStyle = zoneColors[idx%zoneColors.length];
+    overlayCtx.fill();
+
+    overlayCtx.beginPath();
+    overlayCtx.arc(cx,cy,R,startRad,stopRad,false);
+    overlayCtx.strokeStyle = zoneColors[idx%zoneColors.length].replace('0.45','1.0');
+    overlayCtx.lineWidth = 2;
+    overlayCtx.stroke();
+    overlayCtx.restore();
+  });
 }
 
-const placementOrder = [2, 3, 6, 9, 8, 7, 4, 1];
+function createZoneRow(start=0,stop=0){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input inputmode="decimal" value="${formatNumber(start)}"></td><td><input inputmode="decimal" value="${formatNumber(stop)}"></td><td><button>X</button></td>`;
+  Array.from(tr.querySelectorAll('input')).forEach(inp=>{
+    inp.addEventListener('blur',()=>{inp.value=Math.min(Math.max(parseFloat(inp.value)||0,0),360); drawZones(); });
+    inp.addEventListener('input',drawZones);
+  });
+  tr.querySelector('button').addEventListener('click',()=>{tr.remove(); drawZones(); });
+  zonesBody.appendChild(tr);
+  drawZones();
+}
+document.getElementById('addBlockBtn').addEventListener('click',()=>createZoneRow());
 
-function processImage(file, index) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const maxSize = 600;
-      let { width, height } = img;
-
-      if (width > height) {
-        if (width > maxSize) {
-          height *= maxSize / width;
-          width = maxSize;
-        }
-      } else {
-        if (height > maxSize) {
-          width *= maxSize / height;
-          height = maxSize;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      ctx.drawImage(img, 0, 0, width, height);
-      const compressed = canvas.toDataURL("image/jpeg", 0.7);
-
-      const cellIndex = placementOrder[index];
-      const cell = document.getElementById(`cell-${cellIndex}`);
-      cell.innerHTML = "";
-      const imgEl = document.createElement("img");
-      imgEl.src = compressed;
-      cell.appendChild(imgEl);
+// --------- Drag & Drop 8 Photos -----------
+const dropArea=document.getElementById('drop-area');
+const fileInput=document.getElementById('fileElem');
+["dragenter","dragover","dragleave","drop"].forEach(e=>{
+  dropArea.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation();});
+});
+["dragenter","dragover"].forEach(e=>dropArea.addEventListener(e,()=>dropArea.classList.add("highlight")));
+["dragleave","drop"].forEach(e=>dropArea.addEventListener(e,()=>dropArea.classList.remove("highlight")));
+dropArea.addEventListener("drop",e=>handleFiles(e.dataTransfer.files));
+dropArea.addEventListener("click",()=>fileInput.click());
+fileInput.addEventListener("change",()=>handleFiles(fileInput.files));
+const placementOrder=[2,3,6,9,8,7,4,1];
+function handleFiles(files){Array.from(files).slice(0,8).forEach((file,i)=>processImage(file,i));}
+function processImage(file,index){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const ctx=canvas.getContext('2d');
+      const maxSize=600;
+      let {width,height}=img;
+      if(width>height){if(width>maxSize){height*=maxSize/width;width=maxSize;}}
+      else{if(height>maxSize){width*=maxSize/height;height=maxSize;}}
+      canvas.width=width; canvas.height=height; ctx.drawImage(img,0,0,width,height);
+      const compressed=canvas.toDataURL('image/jpeg',0.7);
+      const cell=document.getElementById(`cell-${placementOrder[index]}`);
+      cell.innerHTML=""; const imgEl=document.createElement('img'); imgEl.src=compressed; cell.appendChild(imgEl);
     };
-    img.src = e.target.result;
+    img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
+// --------- PDF Generation (Merged + Fixed) -----------
+document.getElementById('generatePdf').addEventListener('click', async()=>{
+  try {
+    const pdfContainer = document.createElement('div');
+    pdfContainer.style.width = '720px';
+    pdfContainer.style.background = '#fff';
+    pdfContainer.style.padding = '10px';
+    pdfContainer.style.borderRadius = '8px';
 
+    const vesselNameVal = document.getElementById('vesselName').value.trim();
+    const antennaLocVal = document.getElementById('antennaLocation').value.trim();
+    if(vesselNameVal || antennaLocVal){
+      const infoDiv = document.createElement('div');
+      infoDiv.style.textAlign = 'center';
+      infoDiv.style.marginBottom = '8px';
+      if(vesselNameVal) infoDiv.innerHTML += `<div><strong>Vessel:</strong> ${vesselNameVal}</div>`;
+      if(antennaLocVal) infoDiv.innerHTML += `<div><strong>Antenna & Location:</strong> ${antennaLocVal}</div>`;
+      pdfContainer.appendChild(infoDiv);
+    }
 
+    const rows = Array.from(zonesBody.querySelectorAll('tr'));
+    if(rows.length > 0){
+      const table = document.createElement('table');
+      table.className = 'pdfTable';
+      const thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th>#</th><th>AZ Start</th><th>AZ Stop</th></tr>';
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      rows.forEach((row, idx)=>{
+        const start = row.cells[0].querySelector('input').value;
+        const stop  = row.cells[1].querySelector('input').value;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${idx+1}</td><td>${formatNumber(start)}°</td><td>${formatNumber(stop)}°</td>`;
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      pdfContainer.appendChild(table);
+    }
 
+    async function createVesselCanvasForPDF(){
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = vesselImg.src;
+      await new Promise(resolve => img.onload = resolve);
 
-document.getElementById("generate").addEventListener("click", async () => {
-  const grid = document.getElementById("grid");
+      const rect = vesselImg.getBoundingClientRect();
+      const canvas = document.createElement('canvas');
+      canvas.width = rect.width * 2;
+      canvas.height = rect.height * 2;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(2,2);
 
-  // Temporarily hide UI elements before rendering
-  document.getElementById("drop-area").style.display = "none";
-  document.getElementById("generate").style.display = "none";
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.25)';
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 4;
+      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      ctx.restore();
 
-  const canvas = await html2canvas(grid, { scale: 2 });
-  const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const cx = rect.width/2, cy = rect.height/2;
+      const R = Math.min(rect.width, rect.height)*0.42;
+      Array.from(zonesBody.querySelectorAll('tr')).forEach((row, idx)=>{
+        const start = parseFloat(row.cells[0].querySelector('input').value);
+        const stop  = parseFloat(row.cells[1].querySelector('input').value);
+        if(isNaN(start)||isNaN(stop)) return;
+        const startRad = (start-90)*Math.PI/180;
+        const stopRad  = (stop-90)*Math.PI/180;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.beginPath();
+        ctx.moveTo(cx,cy);
+        ctx.arc(cx,cy,R,startRad,stopRad,false);
+        ctx.closePath();
+        ctx.fillStyle = zoneColors[idx%zoneColors.length];
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx,cy,R,startRad,stopRad,false);
+        ctx.strokeStyle = zoneColors[idx%zoneColors.length].replace('0.45','1.0');
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      });
+      return canvas;
+    }
 
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF("p", "mm", "a4");
-  const pageWidth = 210;
-  const pageHeight = 297;
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-  const posY = (pageHeight - imgHeight) / 2;
+    const gridClone = document.getElementById('grid').cloneNode(true);
+    const centerCellClone = gridClone.querySelector('#cell-5');
+    centerCellClone.innerHTML = '';
+    const vesselCanvas = await createVesselCanvasForPDF();
+    const imgEl = document.createElement('img');
+    imgEl.src = vesselCanvas.toDataURL('image/png');
+    centerCellClone.appendChild(imgEl);
 
-  pdf.addImage(imgData, "JPEG", 0, posY, imgWidth, imgHeight);
-  pdf.save("photos.pdf");
+    pdfContainer.appendChild(gridClone);
 
-  // Restore UI
-  document.getElementById("drop-area").style.display = "block";
-  document.getElementById("generate").style.display = "inline-block";
+    document.body.appendChild(pdfContainer);
+    const canvas = await html2canvas(pdfContainer,{scale:2,useCORS:true});
+    const imgData = canvas.toDataURL('image/jpeg',0.95);
+    const {jsPDF} = window.jspdf;
+    const pdf = new jsPDF('p','mm','a4');
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height*imgWidth)/canvas.width;
+    const posY = (pageHeight - imgHeight)/2;
+    pdf.addImage(imgData,'JPEG',0,posY,imgWidth,imgHeight);
+    pdf.save('blockage_photos.pdf');
+    pdfContainer.remove();
+  } catch(err) {
+    console.error("PDF generation failed:", err);
+    alert("PDF generation failed. Check console for details.");
+  }
 });
+
+window.addEventListener('DOMContentLoaded',resizeOverlay);
 </script>
 </body>
 </html>
