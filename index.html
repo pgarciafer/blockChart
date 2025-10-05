@@ -11,16 +11,16 @@ body { font-family: sans-serif; text-align:center; padding:20px; background:#f5f
 #drop-area.highlight { border-color:#2196f3; background:#e3f2fd; }
 #drop-area p { margin:0; }
 #grid {
-    width: 95%;
-    max-width: 720px; /* keeps grid from growing too large */
-    height: 720px;
+    width: 85%;
+    max-width: 650px; /* keeps grid from growing too large */
+    height: 650px;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3, 1fr);
-    gap: 10px;
+    gap: 8px;
     margin: 0 auto; /* ensures horizontal centering */
     background: white;
-    padding: 10px;
+    padding: 8px;
     border-radius: 8px;
     position: relative;
 }
@@ -64,13 +64,16 @@ th, td{padding:6px; text-align:center; border-bottom:1px solid #e6eef8;}
   <div style="margin-bottom:12px; text-align:center;">
     <input id="vesselName" type="text" placeholder="3LC_VesselName" style="padding:6px 10px; margin-right:8px; width:200px; border-radius:6px; border:1px solid #ccc;">
     <input id="antennaLocation" type="text" placeholder="Antenna & Location" style="padding:6px 10px; width:250px; border-radius:6px; border:1px solid #ccc;">
+<input id="dateInput" type="date" 
+         style="padding:6px 10px; border-radius:6px; border:1px solid #ccc;">  
+  <input id="submittedBy" type="text" placeholder="Tech Name" style="padding:6px 10px; border-radius:6px; border:1px solid #ccc;">
   </div>
 
   <div class="controls">
     <div class="panel">
       <label>Blockage Zones (AZ Start / AZ Stop in degrees)</label>
       <table id="zonesTable">
-        <thead><tr><th>AZ Start</th><th>AZ Stop</th><th></th></tr></thead>
+        <thead><tr><th>AZ Start</th><th>AZ Stop</th><th>EL</th><th></th></tr></thead>
         <tbody id="zonesBody"></tbody>
       </table>
       <div style="margin-top:8px;font-size:13px;color:#536878">
@@ -108,6 +111,13 @@ th, td{padding:6px; text-align:center; border-bottom:1px solid #e6eef8;}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
+// Set default date to today  <-- added
+const today = new Date();
+const yyyy = today.getFullYear();
+const mm = String(today.getMonth()+1).padStart(2,'0');
+const dd = String(today.getDate()).padStart(2,'0');
+document.getElementById('dateInput').value = `${yyyy}-${mm}-${dd}`;
+
 // --------- Blockage Zones -----------
 const zoneColors = ["rgba(255,0,0,0.45)","rgba(0,128,255,0.45)","rgba(0,200,0,0.45)","rgba(255,165,0,0.45)","rgba(128,0,128,0.45)","rgba(255,20,147,0.45)"];
 const zonesBody=document.getElementById('zonesBody');
@@ -127,52 +137,86 @@ function resizeOverlay(){
   drawZones();
 }
 
-function drawZones(){
-  overlayCtx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
-  const cx = overlayCanvas.width/2;
-  const cy = overlayCanvas.height/2;
-  const R = Math.min(overlayCanvas.width, overlayCanvas.height)*0.42;
+function drawZones() {
+  const ctx = overlayCtx;
+  const rect = vesselImg.getBoundingClientRect();
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+  const radius = Math.min(rect.width, rect.height) * 0.42;
 
-  Array.from(zonesBody.querySelectorAll('tr')).forEach((row, idx) => {
-    const start = parseFloat(row.cells[0].querySelector('input').value);
-    const stop = parseFloat(row.cells[1].querySelector('input').value);
-    if(isNaN(start)||isNaN(stop)) return;
-    const startRad = (start-90)*Math.PI/180;
-    const stopRad = (stop-90)*Math.PI/180;
+  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-    overlayCtx.save();
-    overlayCtx.shadowColor = 'rgba(0,0,0,0.3)';
-    overlayCtx.shadowBlur = 8;
-    overlayCtx.shadowOffsetX = 0;
-    overlayCtx.shadowOffsetY = 0;
+  const rows = zonesBody.querySelectorAll('tr');
+  rows.forEach(row => {
+    const start = parseFloat(row.cells[0].querySelector('input').value) || 0;
+    const stop = parseFloat(row.cells[1].querySelector('input').value) || 0;
+    const el = parseFloat(row.cells[2].querySelector('input').value) || 0;
 
-    overlayCtx.beginPath();
-    overlayCtx.moveTo(cx,cy);
-    overlayCtx.arc(cx,cy,R,startRad,stopRad,false);
-    overlayCtx.closePath();
-    overlayCtx.fillStyle = zoneColors[idx%zoneColors.length];
-    overlayCtx.fill();
+    const startRad = (start - 90) * Math.PI / 180;
+    const stopRad = (stop - 90) * Math.PI / 180;
+    const elClamped = Math.min(Math.max(el, 0), 90);
+    const opacity = 0.2 + (elClamped / 90) * 0.8;
 
-    overlayCtx.beginPath();
-    overlayCtx.arc(cx,cy,R,startRad,stopRad,false);
-    overlayCtx.strokeStyle = zoneColors[idx%zoneColors.length].replace('0.45','1.0');
-    overlayCtx.lineWidth = 2;
-    overlayCtx.stroke();
-    overlayCtx.restore();
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.3)'; // add subtle shadow
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startRad, stopRad, false);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(255,0,0,${opacity})`;
+    ctx.fill();
+    ctx.restore();
+
+    // optional: draw EL label
+    let midAngle;
+if (stop < start) {
+    // If the zone wraps around, treat stop as being beyond 360
+    midAngle = ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2;
+} else {
+    midAngle = (startRad + stopRad) / 2;
+}
+    const labelX = centerX + Math.cos(midAngle) * radius * 0.7;
+    const labelY = centerY + Math.sin(midAngle) * radius * 0.7;
+    ctx.fillStyle = 'black';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${Math.round(el)}°`, labelX, labelY);
   });
 }
 
-function createZoneRow(start=0,stop=0){
-  const tr=document.createElement('tr');
-  tr.innerHTML=`<td><input inputmode="decimal" value="${formatNumber(start)}"></td><td><input inputmode="decimal" value="${formatNumber(stop)}"></td><td><button>X</button></td>`;
-  Array.from(tr.querySelectorAll('input')).forEach(inp=>{
-    inp.addEventListener('blur',()=>{inp.value=Math.min(Math.max(parseFloat(inp.value)||0,0),360); drawZones(); });
-    inp.addEventListener('input',drawZones);
+
+
+function createZoneRow(start = 0, stop = 0, el = 0) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input inputmode="decimal" value="${formatNumber(start)}"></td>
+    <td><input inputmode="decimal" value="${formatNumber(stop)}"></td>
+    <td><input inputmode="decimal" value="${formatNumber(el)}"></td>
+    <td><button>X</button></td>
+  `;
+
+  Array.from(tr.querySelectorAll('input')).forEach(inp => {
+    inp.addEventListener('blur', () => {
+      inp.value = Math.min(Math.max(parseFloat(inp.value) || 0, 0), 360);
+      drawZones();
+    });
+    inp.addEventListener('input', drawZones);
   });
-  tr.querySelector('button').addEventListener('click',()=>{tr.remove(); drawZones(); });
+
+  tr.querySelector('button').addEventListener('click', () => {
+    tr.remove();
+    drawZones();
+  });
+
   zonesBody.appendChild(tr);
   drawZones();
 }
+
 document.getElementById('addBlockBtn').addEventListener('click',()=>createZoneRow());
 
 // --------- Drag & Drop 8 Photos -----------
@@ -211,92 +255,227 @@ function processImage(file,index){
 
 // --------- PDF Generation (Merged + Fixed) -----------
 document.getElementById('generatePdf').addEventListener('click', async()=>{
-  try {
-    const pdfContainer = document.createElement('div');
-    pdfContainer.style.width = '720px';
-    pdfContainer.style.background = '#fff';
-    pdfContainer.style.padding = '10px';
-    pdfContainer.style.borderRadius = '8px';
+  try {
+    const pdfContainer = document.createElement('div');
+    pdfContainer.style.width = '720px';
+    pdfContainer.style.background = '#fff';
+    pdfContainer.style.padding = '10px';
+    pdfContainer.style.borderRadius = '8px';
 
-    const vesselNameVal = document.getElementById('vesselName').value.trim();
-    const antennaLocVal = document.getElementById('antennaLocation').value.trim();
-    if(vesselNameVal || antennaLocVal){
-      const infoDiv = document.createElement('div');
-      infoDiv.style.textAlign = 'center';
-      infoDiv.style.marginBottom = '8px';
-      if(vesselNameVal) infoDiv.innerHTML += `<div><strong>Vessel:</strong> ${vesselNameVal}</div>`;
-      if(antennaLocVal) infoDiv.innerHTML += `<div><strong>Antenna & Location:</strong> ${antennaLocVal}</div>`;
-      pdfContainer.appendChild(infoDiv);
-    }
+    const vesselNameVal = document.getElementById('vesselName').value.trim();
+    const antennaLocVal = document.getElementById('antennaLocation').value.trim();
+    const dateVal = document.getElementById('dateInput').value;
+    const submittedByVal = document.getElementById('submittedBy').value.trim(); // <-- Added
+
+    if(vesselNameVal || antennaLocVal || dateVal || submittedByVal){ // <-- Updated condition
+      const infoDiv = document.createElement('div');
+      infoDiv.style.textAlign = 'center';
+      infoDiv.style.marginBottom = '8px';
+      if(vesselNameVal) infoDiv.innerHTML += `<div><strong>Vessel:</strong> ${vesselNameVal}</div>`;
+      if(antennaLocVal) infoDiv.innerHTML += `<div><strong>Antenna & Location:</strong> ${antennaLocVal}</div>`;
+      if(dateVal) infoDiv.innerHTML += `<div><strong>Date:</strong> ${dateVal}</div>`;
+      if(submittedByVal) infoDiv.innerHTML += `<div><strong>Submitted by:</strong> ${submittedByVal}</div>`; // <-- Added
+      pdfContainer.appendChild(infoDiv);
+    }
 
     const rows = Array.from(zonesBody.querySelectorAll('tr'));
-    if(rows.length > 0){
-      const table = document.createElement('table');
-      table.className = 'pdfTable';
-      const thead = document.createElement('thead');
-      thead.innerHTML = '<tr><th>#</th><th>AZ Start</th><th>AZ Stop</th></tr>';
-      table.appendChild(thead);
-      const tbody = document.createElement('tbody');
-      rows.forEach((row, idx)=>{
-        const start = row.cells[0].querySelector('input').value;
-        const stop  = row.cells[1].querySelector('input').value;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${idx+1}</td><td>${formatNumber(start)}°</td><td>${formatNumber(stop)}°</td>`;
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody);
-      pdfContainer.appendChild(table);
-    }
+if (rows.length > 0) {
+  const gridCanvas = createBlockageGridCanvas();
+  const gridImg = document.createElement('img');
+  gridImg.src = gridCanvas.toDataURL('image/png');
+  gridImg.style.display = 'block';
+  gridImg.style.margin = '10px auto';
+  // ❌ REMOVE THIS LINE:
+  // gridImg.style.border = '1px solid #999';
+  pdfContainer.appendChild(gridImg);
+}
 
-    async function createVesselCanvasForPDF(){
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = vesselImg.src;
-      await new Promise(resolve => img.onload = resolve);
+function createBlockageGridCanvas() {
+  const cols = 72; // 5° per column
+  const rows = 18; // 5° per row
+  const cellSize = 9; // smaller for PDF
+  const margin = 20;  // smaller margin
 
-      const rect = vesselImg.getBoundingClientRect();
-      const canvas = document.createElement('canvas');
-      canvas.width = rect.width * 2;
-      canvas.height = rect.height * 2;
-      const ctx = canvas.getContext('2d');
-      ctx.scale(2,2);
+  const width = cols * cellSize + margin * 2;
+  const height = rows * cellSize + margin * 2;
 
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.25)';
-      ctx.shadowBlur = 20;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 4;
-      ctx.drawImage(img, 0, 0, rect.width, rect.height);
-      ctx.restore();
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
 
-      const cx = rect.width/2, cy = rect.height/2;
-      const R = Math.min(rect.width, rect.height)*0.42;
-      Array.from(zonesBody.querySelectorAll('tr')).forEach((row, idx)=>{
-        const start = parseFloat(row.cells[0].querySelector('input').value);
-        const stop  = parseFloat(row.cells[1].querySelector('input').value);
-        if(isNaN(start)||isNaN(stop)) return;
-        const startRad = (start-90)*Math.PI/180;
-        const stopRad  = (stop-90)*Math.PI/180;
-        ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.3)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        ctx.beginPath();
-        ctx.moveTo(cx,cy);
-        ctx.arc(cx,cy,R,startRad,stopRad,false);
-        ctx.closePath();
-        ctx.fillStyle = zoneColors[idx%zoneColors.length];
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(cx,cy,R,startRad,stopRad,false);
-        ctx.strokeStyle = zoneColors[idx%zoneColors.length].replace('0.45','1.0');
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.restore();
-      });
-      return canvas;
-    }
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.translate(margin, height - margin); // origin at bottom-left
+
+  // --- Draw X and Y axes ---
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+
+  // Y-Axis
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -rows * cellSize);
+  ctx.stroke();
+
+  // X-Axis
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(cols * cellSize, 0);
+  ctx.stroke();
+  // ---------------------------
+
+  // Draw internal gridlines only
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 0.5;
+
+  for (let c = 1; c < cols; c++) {
+    const x = c * cellSize;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, -rows * cellSize);
+    ctx.stroke();
+  }
+  for (let r = 1; r < rows; r++) {
+    const y = -r * cellSize;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(cols * cellSize, y);
+    ctx.stroke();
+  }
+
+  // Fill blockage zones
+  const zoneRows = Array.from(zonesBody.querySelectorAll('tr'));
+  ctx.fillStyle = 'rgba(128,128,128,0.7)';
+  zoneRows.forEach(row => {
+    const azStart = parseFloat(row.cells[0].querySelector('input').value) || 0;
+    const azStop  = parseFloat(row.cells[1].querySelector('input').value) || 0;
+    const el      = parseFloat(row.cells[2].querySelector('input').value) || 0;
+    const elClamped = Math.min(Math.max(el, 0), 90);
+    const rowTop = Math.floor((elClamped / 90) * rows);
+
+    const normalizeAz = az => (az < 180 ? 36 + Math.floor(az/5) : Math.floor((az-180)/5));
+    const cStart = normalizeAz(azStart);
+    const cStop  = normalizeAz(azStop);
+
+    const fillCell = (c,r) => ctx.fillRect(c*cellSize, -r*cellSize - cellSize, cellSize, cellSize);
+
+    if(cStart <= cStop){
+      for(let c=cStart;c<=cStop;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
+    } else {
+      for(let c=cStart;c<cols;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
+      for(let c=0;c<=cStop;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
+    }
+  });
+
+  // Draw only small ticks for axes, not full lines
+  ctx.fillStyle = '#000';
+  ctx.font = '8px sans-serif';
+
+  // X-axis ticks every 10°
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let az = 180; az <= 540; az += 10) {
+    let colIndex = az <= 360 ? (az - 180) / 5 : (az - 540) / 5 + 72;
+    const x = colIndex * cellSize;
+    if (x < 0 || x > cols * cellSize) continue;
+
+    // draw tick line
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, 3);
+    ctx.stroke();
+
+    // rotate text
+    ctx.save();
+    ctx.translate(x, 6);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillText((az % 360).toString(), 0, 0);
+    ctx.restore();
+  }
+
+  // Y-axis ticks every 5°
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for(let el=0; el<=90; el+=5){
+    const y = -(el/90)*rows*cellSize;
+    ctx.beginPath();
+    ctx.moveTo(-3,y); ctx.lineTo(0,y); ctx.stroke();
+    // Adjusted position for text separation
+    ctx.fillText(el.toString(), -8, y);
+  }
+
+  return canvas;
+}
+
+
+async function createVesselCanvasForPDF() {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = vesselImg.src;
+  await new Promise(resolve => img.onload = resolve);
+
+  const rect = vesselImg.getBoundingClientRect();
+  const canvas = document.createElement('canvas');
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  // ---- draw vessel with same shadow as live view ----
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.25)';
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 4;
+  ctx.drawImage(img, 0, 0, rect.width, rect.height);
+  ctx.restore();
+
+  // ---- draw arcs identical to browser ----
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  const R = Math.min(rect.width, rect.height) * 0.42;
+
+  Array.from(zonesBody.querySelectorAll('tr')).forEach((row, idx) => {
+    const start = parseFloat(row.cells[0].querySelector('input').value);
+    const stop  = parseFloat(row.cells[1].querySelector('input').value);
+    const el    = parseFloat(row.cells[2].querySelector('input').value);
+    if (isNaN(start) || isNaN(stop)) return;
+
+    const startRad = (start - 90) * Math.PI / 180;
+    const stopRad  = (stop  - 90) * Math.PI / 180;
+    const elClamped = Math.min(Math.max(el, 0), 90);
+    const opacity = 0.2 + (elClamped / 90) * 0.8;   // same opacity logic
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';            // same soft shadow
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R, startRad, stopRad, false);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
+    ctx.fill();
+    ctx.restore();
+
+    // ---- EL label ----
+    const midAngle = (startRad + stopRad) / 2;
+    const labelX = cx + Math.cos(midAngle) * R * 0.7;
+    const labelY = cy + Math.sin(midAngle) * R * 0.7;
+    ctx.fillStyle = 'black';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${Math.round(el)}°`, labelX, labelY);
+  });
+
+  return canvas;
+}
+
 
     const gridClone = document.getElementById('grid').cloneNode(true);
     const centerCellClone = gridClone.querySelector('#cell-5');
@@ -321,7 +500,9 @@ document.getElementById('generatePdf').addEventListener('click', async()=>{
     pdf.addImage(imgData,'JPEG',0,posY,imgWidth,imgHeight);
     // Get input values and sanitize them for filename
 
-const fileName = `${vesselNameVal}_BlockageChart_${antennaLocVal}.pdf`.replace(/[\/\\?%*:|"<>]/g, '_');
+    const cleanDate = dateVal.replace(/-/g,''); // <-- added
+    const fileName = `${vesselNameVal}_BlockageChart_${antennaLocVal}_${cleanDate}.pdf`
+      .replace(/[\/\\?%*:|"<>]/g, '_');
 
 pdf.save(fileName);
 
