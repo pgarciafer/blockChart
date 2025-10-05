@@ -1,565 +1,594 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Photo Grid with Vessel Blockage Zones</title>
-<style>
-body { font-family: sans-serif; text-align:center; padding:20px; background:#f5f5f5; }
-.card { max-width:950px; margin:auto; background:white; border-radius:12px; padding:18px; }
-#drop-area { border:2px dashed #666; border-radius:10px; padding:20px; background:#fff; margin-bottom:12px; cursor:pointer; }
-#drop-area.highlight { border-color:#2196f3; background:#e3f2fd; }
-#drop-area p { margin:0; }
-#grid {
-    width: 85%;
-    max-width: 650px; /* keeps grid from growing too large */
-    height: 650px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-    gap: 8px;
-    margin: 0 auto; /* ensures horizontal centering */
-    background: white;
-    padding: 8px;
-    border-radius: 8px;
-    position: relative;
-}
-
-.cell { background:#eee; display:flex; justify-content:center; align-items:center; overflow:hidden; position:relative; border-radius:6px; cursor:pointer; }
-.cell img { width:100%; height:100%; object-fit:cover; }
-.center-cell { background:white; position:relative; }
-button { padding:10px 20px; margin-top:10px; }
-table{width:100%; border-collapse:collapse; margin-top:8px;}
-th, td{padding:6px; text-align:center; border-bottom:1px solid #e6eef8;}
-#zonesTable td button{background:#ef4444;color:white;border-radius:4px;border:none;padding:4px 6px;}
-.zone-color{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;}
-.pdfTable { width:60%; border-collapse:collapse; margin: 0 auto 12px; }
-.pdfTable th, .pdfTable td { border:1px solid #aaa; padding:4px; text-align:center; }
-
-/* Shadow wrapper */
-.vessel-wrapper {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    border-radius: 6px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-}
-.vessel-wrapper img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    position: absolute;
-    left:0;
-    top:0;
-    z-index:1;
-    border-radius:6px;
-}
-#overlayCanvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; }
-</style>
-</head>
-<body>
-<div class="card">
-  <h1>Photo Grid — Vessel Blockage Zones</h1>
-
-  <div style="margin-bottom:12px; text-align:center;">
-    <input id="vesselName" type="text" placeholder="3LC_VesselName" style="padding:6px 10px; margin-right:8px; width:200px; border-radius:6px; border:1px solid #ccc;">
-    <input id="antennaLocation" type="text" placeholder="Antenna & Location" style="padding:6px 10px; width:250px; border-radius:6px; border:1px solid #ccc;">
-<input id="dateInput" type="date" 
-         style="padding:6px 10px; border-radius:6px; border:1px solid #ccc;">  
-  <input id="submittedBy" type="text" placeholder="Tech Name" style="padding:6px 10px; border-radius:6px; border:1px solid #ccc;">
-  </div>
-
-  <div class="controls">
-    <div class="panel">
-      <label>Blockage Zones (AZ Start / AZ Stop in degrees)</label>
-      <table id="zonesTable">
-        <thead><tr><th>AZ Start</th><th>AZ Stop</th><th>EL</th><th></th></tr></thead>
-        <tbody id="zonesBody"></tbody>
-      </table>
-      <div style="margin-top:8px;font-size:13px;color:#536878">
-        Add zones and they will be drawn over the center vessel. They are also included in the PDF.
-      </div>
-    </div>
-  </div>
-
-  <div id="drop-area">
-    <p>📸 Drop up to 8 photos here or click to browse</p>
-    <input type="file" id="fileElem" accept="image/*" multiple style="display:none">
-  </div>
-
-  <button id="addBlockBtn">Add Blockage Zone</button>
-  <button id="generatePdf">Generate PDF</button>
-
-  <div id="grid">
-    <div class="cell" id="cell-1"></div>
-    <div class="cell" id="cell-2"></div>
-    <div class="cell" id="cell-3"></div>
-    <div class="cell" id="cell-4"></div>
-    <div class="cell center-cell" id="cell-5">
-      <div class="vessel-wrapper">
-        <img id="vesselImage" crossorigin="anonymous" src="https://pgarciafer.github.io/satcalc/IMG_0585.PNG" alt="Vessel">
-        <canvas id="overlayCanvas"></canvas>
-      </div>
-    </div>
-    <div class="cell" id="cell-6"></div>
-    <div class="cell" id="cell-7"></div>
-    <div class="cell" id="cell-8"></div>
-    <div class="cell" id="cell-9"></div>
-  </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script>
-// Set default date to today  <-- added
-const today = new Date();
-const yyyy = today.getFullYear();
-const mm = String(today.getMonth()+1).padStart(2,'0');
-const dd = String(today.getDate()).padStart(2,'0');
-document.getElementById('dateInput').value = `${yyyy}-${mm}-${dd}`;
-
-// --------- Blockage Zones -----------
-const zoneColors = ["rgba(255,0,0,0.45)","rgba(0,128,255,0.45)","rgba(0,200,0,0.45)","rgba(255,165,0,0.45)","rgba(128,0,128,0.45)","rgba(255,20,147,0.45)"];
-const zonesBody=document.getElementById('zonesBody');
-const overlayCanvas=document.getElementById('overlayCanvas');
-const overlayCtx=overlayCanvas.getContext('2d');
-const vesselImg=document.getElementById('vesselImage');
-
-function formatNumber(num){return(Math.round(num*100)/100).toString().replace(/\.00$/,'');}
-
-function resizeOverlay(){
-  const rect = vesselImg.getBoundingClientRect();
-  overlayCanvas.width = rect.width;
-  overlayCanvas.height = rect.height;
-  overlayCanvas.style.width = rect.width + 'px';
-  overlayCanvas.style.height = rect.height + 'px';
-  overlayCtx.setTransform(1,0,0,1,0,0);
-  drawZones();
-}
-
-function drawZones() {
-  const ctx = overlayCtx;
-  const rect = vesselImg.getBoundingClientRect();
-  const centerX = rect.width / 2;
-  const centerY = rect.height / 2;
-  const radius = Math.min(rect.width, rect.height) * 0.42;
-
-  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-  const rows = zonesBody.querySelectorAll('tr');
-  rows.forEach(row => {
-    const start = parseFloat(row.cells[0].querySelector('input').value) || 0;
-    const stop = parseFloat(row.cells[1].querySelector('input').value) || 0;
-    const el = parseFloat(row.cells[2].querySelector('input').value) || 0;
-
-    const startRad = (start - 90) * Math.PI / 180;
-    const stopRad = (stop - 90) * Math.PI / 180;
-    const elClamped = Math.min(Math.max(el, 0), 90);
-    const opacity = 0.2 + (elClamped / 90) * 0.8;
-
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.3)'; // add subtle shadow
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.arc(centerX, centerY, radius, startRad, stopRad, false);
-    ctx.closePath();
-    ctx.fillStyle = `rgba(255,0,0,${opacity})`;
-    ctx.fill();
-    ctx.restore();
-
-    // optional: draw EL label
-    let midAngle;
-if (stop < start) {
-    // If the zone wraps around, treat stop as being beyond 360
-    midAngle = ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2;
-} else {
-    midAngle = (startRad + stopRad) / 2;
-}
-    const labelX = centerX + Math.cos(midAngle) * radius * 0.7;
-    const labelY = centerY + Math.sin(midAngle) * radius * 0.7;
-    ctx.fillStyle = 'black';
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${Math.round(el)}°`, labelX, labelY);
-  });
-}
-
-
-
-function createZoneRow(start = 0, stop = 0, el = 0) {
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td><input inputmode="decimal" value="${formatNumber(start)}"></td>
-    <td><input inputmode="decimal" value="${formatNumber(stop)}"></td>
-    <td><input inputmode="decimal" value="${formatNumber(el)}"></td>
-    <td><button>X</button></td>
-  `;
-
-  Array.from(tr.querySelectorAll('input')).forEach(inp => {
-    inp.addEventListener('blur', () => {
-      inp.value = Math.min(Math.max(parseFloat(inp.value) || 0, 0), 360);
-      drawZones();
-    });
-    inp.addEventListener('input', drawZones);
-  });
-
-  tr.querySelector('button').addEventListener('click', () => {
-    tr.remove();
-    drawZones();
-  });
-
-  zonesBody.appendChild(tr);
-  drawZones();
-}
-
-document.getElementById('addBlockBtn').addEventListener('click',()=>createZoneRow());
-
-// --------- Drag & Drop 8 Photos -----------
-const dropArea=document.getElementById('drop-area');
-const fileInput=document.getElementById('fileElem');
-["dragenter","dragover","dragleave","drop"].forEach(e=>{
-  dropArea.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation();});
-});
-["dragenter","dragover"].forEach(e=>dropArea.addEventListener(e,()=>dropArea.classList.add("highlight")));
-["dragleave","drop"].forEach(e=>dropArea.addEventListener(e,()=>dropArea.classList.remove("highlight")));
-dropArea.addEventListener("drop",e=>handleFiles(e.dataTransfer.files));
-dropArea.addEventListener("click",()=>fileInput.click());
-fileInput.addEventListener("change",()=>handleFiles(fileInput.files));
-const placementOrder=[2,3,6,9,8,7,4,1];
-function handleFiles(files){Array.from(files).slice(0,8).forEach((file,i)=>processImage(file,i));}
-function processImage(file,index){
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const img=new Image();
-    img.onload=()=>{
-      const canvas=document.createElement('canvas');
-      const ctx=canvas.getContext('2d');
-      const maxSize=600;
-      let {width,height}=img;
-      if(width>height){if(width>maxSize){height*=maxSize/width;width=maxSize;}}
-      else{if(height>maxSize){width*=maxSize/height;height=maxSize;}}
-      canvas.width=width; canvas.height=height; ctx.drawImage(img,0,0,width,height);
-      const compressed=canvas.toDataURL('image/jpeg',0.7);
-      const cell=document.getElementById(`cell-${placementOrder[index]}`);
-      cell.innerHTML=""; const imgEl=document.createElement('img'); imgEl.src=compressed; cell.appendChild(imgEl);
-    };
-    img.src=e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-// --------- PDF Generation (Merged + Fixed) -----------
-document.getElementById('generatePdf').addEventListener('click', async()=>{
-  try {
-    const pdfContainer = document.createElement('div');
-    pdfContainer.style.width = '720px';
-    pdfContainer.style.background = '#fff';
-    pdfContainer.style.padding = '10px';
-    pdfContainer.style.borderRadius = '8px';
-
-    const vesselNameVal = document.getElementById('vesselName').value.trim();
-    const antennaLocVal = document.getElementById('antennaLocation').value.trim();
-    const dateVal = document.getElementById('dateInput').value;
-    const submittedByVal = document.getElementById('submittedBy').value.trim(); // <-- Added
-
-    if(vesselNameVal || antennaLocVal || dateVal || submittedByVal){ // <-- Updated condition
-      const infoDiv = document.createElement('div');
-      infoDiv.style.textAlign = 'center';
-      infoDiv.style.marginBottom = '8px';
-      if(vesselNameVal) infoDiv.innerHTML += `<div><strong>Vessel:</strong> ${vesselNameVal}</div>`;
-      if(antennaLocVal) infoDiv.innerHTML += `<div><strong>Antenna & Location:</strong> ${antennaLocVal}</div>`;
-      if(dateVal) infoDiv.innerHTML += `<div><strong>Date:</strong> ${dateVal}</div>`;
-      if(submittedByVal) infoDiv.innerHTML += `<div><strong>Submitted by:</strong> ${submittedByVal}</div>`; // <-- Added
-      pdfContainer.appendChild(infoDiv);
-    }
-
-    const rows = Array.from(zonesBody.querySelectorAll('tr'));
-if (rows.length > 0) {
-  const gridCanvas = createBlockageGridCanvas();
-  const gridImg = document.createElement('img');
-  gridImg.src = gridCanvas.toDataURL('image/png');
-  gridImg.style.display = 'block';
-  gridImg.style.margin = '10px auto';
-  // ❌ REMOVE THIS LINE:
-  // gridImg.style.border = '1px solid #999';
-  pdfContainer.appendChild(gridImg);
-}
-
-function createBlockageGridCanvas() {
-  const cols = 72; // 5° per column
-  const rows = 18; // 5° per row
-  const cellSize = 9; // smaller for PDF
-  const margin = 20;  // smaller margin
-
-  const width = cols * cellSize + margin * 2;
-  const height = rows * cellSize + margin * 2;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.translate(margin, height - margin); // origin at bottom-left
-
-  // --- Draw X and Y axes ---
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 1;
-
-  // Y-Axis
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(0, -rows * cellSize);
-  ctx.stroke();
-
-  // X-Axis
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(cols * cellSize, 0);
-  ctx.stroke();
-  // ---------------------------
-
-  // Draw internal gridlines only
-  ctx.strokeStyle = '#ddd';
-  ctx.lineWidth = 0.5;
-
-  for (let c = 1; c < cols; c++) {
-    const x = c * cellSize;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, -rows * cellSize);
-    ctx.stroke();
-  }
-  for (let r = 1; r < rows; r++) {
-    const y = -r * cellSize;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(cols * cellSize, y);
-    ctx.stroke();
-  }
-
-  // Fill blockage zones
-  const zoneRows = Array.from(zonesBody.querySelectorAll('tr'));
-  ctx.fillStyle = 'rgba(128,128,128,0.7)';
-  zoneRows.forEach(row => {
-    const azStart = parseFloat(row.cells[0].querySelector('input').value) || 0;
-    const azStop  = parseFloat(row.cells[1].querySelector('input').value) || 0;
-    const el      = parseFloat(row.cells[2].querySelector('input').value) || 0;
-    const elClamped = Math.min(Math.max(el, 0), 90);
-    const rowTop = Math.floor((elClamped / 90) * rows);
-
-    const normalizeAz = az => (az < 180 ? 36 + Math.floor(az/5) : Math.floor((az-180)/5));
-    const cStart = normalizeAz(azStart);
-    const cStop  = normalizeAz(azStop);
-
-    const fillCell = (c,r) => ctx.fillRect(c*cellSize, -r*cellSize - cellSize, cellSize, cellSize);
-
-    if(cStart <= cStop){
-      for(let c=cStart;c<=cStop;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
-    } else {
-      for(let c=cStart;c<cols;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
-      for(let c=0;c<=cStop;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
-    }
-  });
-
-  // Draw only small ticks for axes, not full lines
-  ctx.fillStyle = '#000';
-  ctx.font = '8px sans-serif';
-
-  // X-axis ticks every 10°
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  for (let az = 180; az <= 540; az += 10) {
-    let colIndex = az <= 360 ? (az - 180) / 5 : (az - 540) / 5 + 72;
-    const x = colIndex * cellSize;
-    if (x < 0 || x > cols * cellSize) continue;
-
-    // draw tick line
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, 3);
-    ctx.stroke();
-
-    // rotate text
-    ctx.save();
-    ctx.translate(x, 6);
-    ctx.rotate(-Math.PI / 4);
-    ctx.fillText((az % 360).toString(), 0, 0);
-    ctx.restore();
-  }
-
-  // Y-axis ticks every 5°
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  for(let el=0; el<=90; el+=5){
-    const y = -(el/90)*rows*cellSize;
-    ctx.beginPath();
-    ctx.moveTo(-3,y); ctx.lineTo(0,y); ctx.stroke();
-    // Adjusted position for text separation
-    ctx.fillText(el.toString(), -8, y);
-  }
-
-  return canvas;
-}
-
-
-async function createVesselCanvasForPDF() {
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = vesselImg.src;
-  await new Promise(resolve => img.onload = resolve);
-
-  const rect = vesselImg.getBoundingClientRect();
-  const canvas = document.createElement('canvas');
-  canvas.width = rect.width * 2;
-  canvas.height = rect.height * 2;
-  const ctx = canvas.getContext('2d');
-  ctx.scale(2, 2);
-
-  // ---- draw vessel with same shadow as live view ----
-// Try these values for more consistency across devices
-ctx.save();
-ctx.shadowColor = 'rgba(0,0,0,0.4)'; // Slightly darker shadow
-ctx.shadowBlur = 10; // Reduced blur amount
-ctx.shadowOffsetX = 0;
-ctx.shadowOffsetY = 4;
-ctx.drawImage(img, 0, 0, rect.width, rect.height);
-ctx.restore();
-
-  // ---- draw arcs identical to browser ----
-  const cx = rect.width / 2;
-  const cy = rect.height / 2;
-  const R = Math.min(rect.width, rect.height) * 0.42;
-
-  Array.from(zonesBody.querySelectorAll('tr')).forEach((row, idx) => {
-    const start = parseFloat(row.cells[0].querySelector('input').value);
-    const stop  = parseFloat(row.cells[1].querySelector('input').value);
-    const el    = parseFloat(row.cells[2].querySelector('input').value);
-    if (isNaN(start) || isNaN(stop)) return;
-
-    const startRad = (start - 90) * Math.PI / 180;
-    const stopRad  = (stop  - 90) * Math.PI / 180;
-    const elClamped = Math.min(Math.max(el, 0), 90);
-    const opacity = 0.2 + (elClamped / 90) * 0.8;   // same opacity logic
-
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.4)';            // same soft shadow
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 4;
-
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, R, startRad, stopRad, false);
-    ctx.closePath();
-    ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
-    ctx.fill();
-    ctx.restore();
-
-    // ---- EL label ----
-    const midAngle = (startRad + stopRad) / 2;
-    const labelX = cx + Math.cos(midAngle) * R * 0.7;
-    const labelY = cy + Math.sin(midAngle) * R * 0.7;
-    ctx.fillStyle = 'black';
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${Math.round(el)}°`, labelX, labelY);
-  });
-
-  return canvas;
-}
-
-
-    const gridClone = document.getElementById('grid').cloneNode(true);
-    const centerCellClone = gridClone.querySelector('#cell-5');
-    centerCellClone.innerHTML = '';
-    const vesselCanvas = await createVesselCanvasForPDF();
-    const imgEl = document.createElement('img');
-    imgEl.src = vesselCanvas.toDataURL('image/png');
-    centerCellClone.appendChild(imgEl);
-
-    pdfContainer.appendChild(gridClone);
-
-    document.body.appendChild(pdfContainer);
-    
-	const canvas = await html2canvas(pdfContainer, {
-    scale: 2,
-    useCORS: true,
-    // Attempt to explicitly handle shadows
-    // This may not work on all devices but is a good practice to try
-    ignoreElements: (element) => {
-        // You can add logic here to ignore elements that are causing issues
-        return false; // return true to ignore, false to render
-    },
-    onrendered: function(canvas) {
-        // You can inspect the rendered canvas here
-    }
-});
-	
-    const imgData = canvas.toDataURL('image/jpeg',0.95);
-    const {jsPDF} = window.jspdf;
-    const pdf = new jsPDF('p','mm','a4');
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height*imgWidth)/canvas.width;
-    const posY = (pageHeight - imgHeight)/2;
-    pdf.addImage(imgData,'JPEG',0,posY,imgWidth,imgHeight);
-    // Get input values and sanitize them for filename
-
-    const cleanDate = dateVal.replace(/-/g,''); // <-- added
-    const fileName = `${vesselNameVal}_BlockageChart_${antennaLocVal}_${cleanDate}.pdf`
-      .replace(/[\/\\?%*:|"<>]/g, '_');
-
-pdf.save(fileName);
-
-    pdfContainer.remove();
-  } catch(err) {
-    console.error("PDF generation failed:", err);
-    alert("PDF generation failed. Check console for details.");
-  }
+	<!doctype html>
+	<html lang="en">
+	<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width,initial-scale=1" />
+	<title>Photo Grid with Vessel Blockage Zones</title>
+	<style>
+	body { font-family: sans-serif; text-align:center; padding:20px; background:#f5f5f5; }
+	.card { max-width:950px; margin:auto; background:white; border-radius:12px; padding:18px; }
+	#drop-area { border:2px dashed #666; border-radius:10px; padding:20px; background:#fff; margin-bottom:12px; cursor:pointer; }
+	#drop-area.highlight { border-color:#2196f3; background:#e3f2fd; }
+	#drop-area p { margin:0; }
+	#grid {
+		width: 85%;
+		max-width: 650px; /* keeps grid from growing too large */
+		height: 650px;
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		grid-template-rows: repeat(3, 1fr);
+		gap: 8px;
+		margin: 0 auto; /* ensures horizontal centering */
+		background: white;
+		padding: 8px;
+		border-radius: 8px;
+		position: relative;
+	}
+
+	.cell { background:#eee; display:flex; justify-content:center; align-items:center; overflow:hidden; position:relative; border-radius:6px; cursor:pointer; }
+	.cell img { width:100%; height:100%; object-fit:cover; }
+	.center-cell { background:white; position:relative; }
+	button { padding:10px 20px; margin-top:10px; }
+	table{width:100%; border-collapse:collapse; margin-top:8px;}
+	th, td{padding:6px; text-align:center; border-bottom:1px solid #e6eef8;}
+	#zonesTable td button{background:#ef4444;color:white;border-radius:4px;border:none;padding:4px 6px;}
+	.zone-color{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;}
+	.pdfTable { width:60%; border-collapse:collapse; margin: 0 auto 12px; }
+	.pdfTable th, .pdfTable td { border:1px solid #aaa; padding:4px; text-align:center; }
+
+	/* Shadow wrapper */
+	.vessel-wrapper {
+		position: relative;
+		width: 100%;
+		height: 100%;
+		border-radius: 6px;
+		box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+	}
+	.vessel-wrapper img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+		position: absolute;
+		left:0;
+		top:0;
+		z-index:1;
+		border-radius:6px;
+	}
+	#overlayCanvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; }
+	</style>
+	</head>
+	<body>
+	<div class="card">
+	  <h1>Photo Grid — Vessel Blockage Zones</h1>
+
+	  <div style="margin-bottom:12px; text-align:center;">
+		<input id="vesselName" type="text" placeholder="3LC_VesselName" style="padding:6px 10px; margin-right:8px; width:200px; border-radius:6px; border:1px solid #ccc;">
+		<input id="antennaLocation" type="text" placeholder="Antenna & Location" style="padding:6px 10px; width:250px; border-radius:6px; border:1px solid #ccc;">
+	<input id="dateInput" type="date" 
+			 style="padding:6px 10px; border-radius:6px; border:1px solid #ccc;">  
+	  <input id="submittedBy" type="text" placeholder="Tech Name" style="padding:6px 10px; border-radius:6px; border:1px solid #ccc;">
+	  </div>
+
+	  <div class="controls">
+		<div class="panel">
+		  <label>Blockage Zones (AZ Start / AZ Stop in degrees)</label>
+		  <table id="zonesTable">
+			<thead><tr><th>AZ Start</th><th>AZ Stop</th><th>EL</th><th></th></tr></thead>
+			<tbody id="zonesBody"></tbody>
+		  </table>
+		  <div style="margin-top:8px;font-size:13px;color:#536878">
+			Add zones and they will be drawn over the center vessel. They are also included in the PDF.
+		  </div>
+		</div>
+	  </div>
+
+	  <div id="drop-area">
+		<p>📸 Drop up to 8 photos here or click to browse</p>
+		<input type="file" id="fileElem" accept="image/*" multiple style="display:none">
+	  </div>
+
+	  <button id="addBlockBtn">Add Blockage Zone</button>
+	  <button id="generatePdf">Generate PDF</button>
+
+	  <div id="grid">
+		<div class="cell" id="cell-1"></div>
+		<div class="cell" id="cell-2"></div>
+		<div class="cell" id="cell-3"></div>
+		<div class="cell" id="cell-4"></div>
+		<div class="cell center-cell" id="cell-5">
+		  <div class="vessel-wrapper">
+			<img id="vesselImage" crossorigin="anonymous" src="https://pgarciafer.github.io/satcalc/IMG_0585.PNG" alt="Vessel">
+			<canvas id="overlayCanvas"></canvas>
+		  </div>
+		</div>
+		<div class="cell" id="cell-6"></div>
+		<div class="cell" id="cell-7"></div>
+		<div class="cell" id="cell-8"></div>
+		<div class="cell" id="cell-9"></div>
+	  </div>
+	</div>
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+	<script>
+	// Set default date to today  <-- added
+	const today = new Date();
+	const yyyy = today.getFullYear();
+	const mm = String(today.getMonth()+1).padStart(2,'0');
+	const dd = String(today.getDate()).padStart(2,'0');
+	document.getElementById('dateInput').value = `${yyyy}-${mm}-${dd}`;
+
+	// --------- Blockage Zones -----------
+	const zoneColors = ["rgba(255,0,0,0.45)","rgba(0,128,255,0.45)","rgba(0,200,0,0.45)","rgba(255,165,0,0.45)","rgba(128,0,128,0.45)","rgba(255,20,147,0.45)"];
+	const zonesBody=document.getElementById('zonesBody');
+	const overlayCanvas=document.getElementById('overlayCanvas');
+	const overlayCtx=overlayCanvas.getContext('2d');
+	const vesselImg=document.getElementById('vesselImage');
+
+	function formatNumber(num){return(Math.round(num*100)/100).toString().replace(/\.00$/,'');}
+
+	function resizeOverlay(){
+	  const rect = vesselImg.getBoundingClientRect();
+	  overlayCanvas.width = rect.width;
+	  overlayCanvas.height = rect.height;
+	  overlayCanvas.style.width = rect.width + 'px';
+	  overlayCanvas.style.height = rect.height + 'px';
+	  overlayCtx.setTransform(1,0,0,1,0,0);
+	  drawZones();
+	}
+
+	function drawZones() {
+	  const ctx = overlayCtx;
+	  const rect = vesselImg.getBoundingClientRect();
+	  const centerX = rect.width / 2;
+	  const centerY = rect.height / 2;
+	  const radius = Math.min(rect.width, rect.height) * 0.42;
+
+	  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+	  const rows = zonesBody.querySelectorAll('tr');
+	  rows.forEach(row => {
+		const start = parseFloat(row.cells[0].querySelector('input').value) || 0;
+		const stop = parseFloat(row.cells[1].querySelector('input').value) || 0;
+		const el = parseFloat(row.cells[2].querySelector('input').value) || 0;
+
+		const startRad = (start - 90) * Math.PI / 180;
+		const stopRad = (stop - 90) * Math.PI / 180;
+		const elClamped = Math.min(Math.max(el, 0), 90);
+		const opacity = 0.2 + (elClamped / 90) * 0.6;
+
+		ctx.save();
+		ctx.shadowColor = 'rgba(0,0,0,0.3)'; // add subtle shadow
+		ctx.shadowBlur = 8;
+		ctx.shadowOffsetX = 0;
+		ctx.shadowOffsetY = 0;
+
+		ctx.beginPath();
+		ctx.moveTo(centerX, centerY);
+		ctx.arc(centerX, centerY, radius, startRad, stopRad, false);
+		ctx.closePath();
+		ctx.fillStyle = `rgba(255,0,0,${opacity})`;
+		ctx.fill();
+		ctx.restore();
+
+		// optional: draw EL label
+		let midAngle;
+	if (stop < start) {
+		// If the zone wraps around, treat stop as being beyond 360
+		midAngle = ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2;
+	} else {
+		midAngle = (startRad + stopRad) / 2;
+	}
+		const labelX = centerX + Math.cos(midAngle) * radius * 0.7;
+		const labelY = centerY + Math.sin(midAngle) * radius * 0.7;
+		ctx.fillStyle = 'black';
+		ctx.font = '12px sans-serif';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillText(`${Math.round(el)}°`, labelX, labelY);
+	  });
+	}
+
+document.getElementById('antennaLocation').addEventListener('input', (event) => {
+    event.target.value = event.target.value.toUpperCase();
 });
 
-document.getElementById('vesselName').addEventListener('change', (event) => {
+document.getElementById('submittedBy').addEventListener('change', (event) => {
     let value = event.target.value.trim();
 
-    // Regular expression to match 3 capital letters
-    const prefixRegex = /^[A-Z]{3}_/;
-    let prefix = '';
-    let namePart = value;
+    // Split the input value into words
+    let words = value.split(/\s+/);
 
-    // Check if the input already has the "ABC_" prefix
-    if (prefixRegex.test(value)) {
-        // If it does, extract the prefix and the rest of the name
-        prefix = value.substring(0, 4);
-        namePart = value.substring(4);
-    } else if (value.length >= 3) {
-        // If not, assume the first 3 characters are the prefix
-        prefix = value.substring(0, 3).toUpperCase() + '_';
-        namePart = value.substring(3);
-    }
-
-    // Split the name part into words
-    let words = namePart.split(/\s+/);
+    // Capitalize the first letter of each word and make the rest lowercase
     let formattedWords = words.map(word => {
         if (word.length === 0) return '';
-        // Capitalize the first letter and make the rest lowercase
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     });
 
-    // Join the words **without** spaces and set the formatted value
-    event.target.value = prefix + formattedWords.join(''); // Changed from .join(' ') to .join('')
+    // Join the words back together with a space and update the input value
+    event.target.value = formattedWords.join(' ');
 });
 
-window.addEventListener('DOMContentLoaded',resizeOverlay);
-</script>
-</body>
-</html>
+	function createZoneRow(start = 0, stop = 0, el = 0) {
+	  const tr = document.createElement('tr');
+	  tr.innerHTML = `
+		<td><input inputmode="decimal" value="${formatNumber(start)}"></td>
+		<td><input inputmode="decimal" value="${formatNumber(stop)}"></td>
+		<td><input inputmode="decimal" value="${formatNumber(el)}"></td>
+		<td><button>X</button></td>
+	  `;
+
+	  Array.from(tr.querySelectorAll('input')).forEach(inp => {
+		inp.addEventListener('blur', () => {
+		  inp.value = Math.min(Math.max(parseFloat(inp.value) || 0, 0), 360);
+		  drawZones();
+		});
+		inp.addEventListener('input', drawZones);
+	  });
+
+	  tr.querySelector('button').addEventListener('click', () => {
+		tr.remove();
+		drawZones();
+	  });
+
+	  zonesBody.appendChild(tr);
+	  drawZones();
+	}
+
+	document.getElementById('addBlockBtn').addEventListener('click',()=>createZoneRow());
+
+	// --------- Drag & Drop 8 Photos -----------
+	const dropArea=document.getElementById('drop-area');
+	const fileInput=document.getElementById('fileElem');
+	["dragenter","dragover","dragleave","drop"].forEach(e=>{
+	  dropArea.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation();});
+	});
+	["dragenter","dragover"].forEach(e=>dropArea.addEventListener(e,()=>dropArea.classList.add("highlight")));
+	["dragleave","drop"].forEach(e=>dropArea.addEventListener(e,()=>dropArea.classList.remove("highlight")));
+	dropArea.addEventListener("drop",e=>handleFiles(e.dataTransfer.files));
+	dropArea.addEventListener("click",()=>fileInput.click());
+	fileInput.addEventListener("change",()=>handleFiles(fileInput.files));
+	const placementOrder=[2,3,6,9,8,7,4,1];
+	function handleFiles(files){Array.from(files).slice(0,8).forEach((file,i)=>processImage(file,i));}
+	function processImage(file,index){
+	  const reader=new FileReader();
+	  reader.onload=e=>{
+		const img=new Image();
+		img.onload=()=>{
+		  const canvas=document.createElement('canvas');
+		  const ctx=canvas.getContext('2d');
+		  const maxSize=600;
+		  let {width,height}=img;
+		  if(width>height){if(width>maxSize){height*=maxSize/width;width=maxSize;}}
+		  else{if(height>maxSize){width*=maxSize/height;height=maxSize;}}
+		  canvas.width=width; canvas.height=height; ctx.drawImage(img,0,0,width,height);
+		  const compressed=canvas.toDataURL('image/jpeg',0.7);
+		  const cell=document.getElementById(`cell-${placementOrder[index]}`);
+		  cell.innerHTML=""; const imgEl=document.createElement('img'); imgEl.src=compressed; cell.appendChild(imgEl);
+		};
+		img.src=e.target.result;
+	  };
+	  reader.readAsDataURL(file);
+	}
+
+	// --------- PDF Generation (Merged + Fixed) -----------
+	document.getElementById('generatePdf').addEventListener('click', async()=>{
+	  try {
+	    const pdfContainer = document.createElement('div');
+	    pdfContainer.style.width = '720px';
+	    pdfContainer.style.background = '#fff';
+	    pdfContainer.style.padding = '10px';
+	    pdfContainer.style.borderRadius = '8px';
+
+	    const vesselNameVal = document.getElementById('vesselName').value.trim();
+	    const antennaLocVal = document.getElementById('antennaLocation').value.trim();
+		const dateVal = document.getElementById('dateInput').value;
+		const submittedByVal = document.getElementById('submittedBy').value.trim(); // <-- Added
+
+	    if(vesselNameVal || antennaLocVal || dateVal || submittedByVal){ // <-- Updated condition
+	      const infoDiv = document.createElement('div');
+	      infoDiv.style.textAlign = 'center';
+	      infoDiv.style.marginBottom = '8px';
+	      if(vesselNameVal) infoDiv.innerHTML += `<div><strong>Vessel:</strong> ${vesselNameVal}</div>`;
+	      if(antennaLocVal) infoDiv.innerHTML += `<div><strong>Antenna & Location:</strong> ${antennaLocVal}</div>`;
+		  if(dateVal) infoDiv.innerHTML += `<div><strong>Date:</strong> ${dateVal}</div>`;
+		  if(submittedByVal) infoDiv.innerHTML += `<div><strong>Submitted by:</strong> ${submittedByVal}</div>`; // <-- Added
+	      pdfContainer.appendChild(infoDiv);
+	    }
+
+		const rows = Array.from(zonesBody.querySelectorAll('tr'));
+	if (rows.length > 0) {
+	  const gridCanvas = createBlockageGridCanvas();
+	  const gridImg = document.createElement('img');
+	  gridImg.src = gridCanvas.toDataURL('image/png');
+	  gridImg.style.display = 'block';
+	  gridImg.style.margin = '10px auto';
+	  // ❌ REMOVE THIS LINE:
+	  // gridImg.style.border = '1px solid #999';
+	  pdfContainer.appendChild(gridImg);
+	}
+
+	function createBlockageGridCanvas() {
+	  const cols = 72; // 5° per column
+	  const rows = 18; // 5° per row
+	  const cellSize = 9; // smaller for PDF
+	  const margin = 20;  // smaller margin
+
+	  const width = cols * cellSize + margin * 2;
+	  const height = rows * cellSize + margin * 2;
+
+	  const canvas = document.createElement('canvas');
+	  canvas.width = width;
+	  canvas.height = height;
+	  const ctx = canvas.getContext('2d');
+
+	  ctx.fillStyle = '#fff';
+	  ctx.fillRect(0, 0, width, height);
+
+	  ctx.translate(margin, height - margin); // origin at bottom-left
+
+	  // --- Draw X and Y axes ---
+	  ctx.strokeStyle = '#000';
+	  ctx.lineWidth = 1;
+
+	  // Y-Axis
+	  ctx.beginPath();
+	  ctx.moveTo(0, 0);
+	  ctx.lineTo(0, -rows * cellSize);
+	  ctx.stroke();
+
+	  // X-Axis
+	  ctx.beginPath();
+	  ctx.moveTo(0, 0);
+	  ctx.lineTo(cols * cellSize, 0);
+	  ctx.stroke();
+	  // ---------------------------
+
+	  // Draw internal gridlines only
+	  ctx.strokeStyle = '#ddd';
+	  ctx.lineWidth = 0.5;
+
+	  for (let c = 1; c < cols; c++) {
+	    const x = c * cellSize;
+	    ctx.beginPath();
+	    ctx.moveTo(x, 0);
+	    ctx.lineTo(x, -rows * cellSize);
+	    ctx.stroke();
+	  }
+	  for (let r = 1; r < rows; r++) {
+	    const y = -r * cellSize;
+	    ctx.beginPath();
+	    ctx.moveTo(0, y);
+	    ctx.lineTo(cols * cellSize, y);
+	    ctx.stroke();
+	  }
+
+	  // Fill blockage zones
+	  const zoneRows = Array.from(zonesBody.querySelectorAll('tr'));
+	  ctx.fillStyle = 'rgba(128,128,128,0.7)';
+	  zoneRows.forEach(row => {
+	    const azStart = parseFloat(row.cells[0].querySelector('input').value) || 0;
+	    const azStop  = parseFloat(row.cells[1].querySelector('input').value) || 0;
+	    const el      = parseFloat(row.cells[2].querySelector('input').value) || 0;
+	    const elClamped = Math.min(Math.max(el, 0), 90);
+	    const rowTop = Math.floor((elClamped / 90) * rows);
+
+	    const normalizeAz = az => (az < 180 ? 36 + Math.floor(az/5) : Math.floor((az-180)/5));
+	    const cStart = normalizeAz(azStart);
+	    const cStop  = normalizeAz(azStop);
+
+	    const fillCell = (c,r) => ctx.fillRect(c*cellSize, -r*cellSize - cellSize, cellSize, cellSize);
+
+	    if(cStart <= cStop){
+	      for(let c=cStart;c<=cStop;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
+	    } else {
+	      for(let c=cStart;c<cols;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
+	      for(let c=0;c<=cStop;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
+	    }
+	  });
+
+	  // Draw only small ticks for axes, not full lines
+	  ctx.fillStyle = '#000';
+	  ctx.font = '8px sans-serif';
+
+	  // X-axis ticks every 10°
+	  ctx.textAlign = 'right';
+	  ctx.textBaseline = 'middle';
+	  for (let az = 180; az <= 540; az += 10) {
+	    let colIndex = az <= 360 ? (az - 180) / 5 : (az - 540) / 5 + 72;
+	    const x = colIndex * cellSize;
+	    if (x < 0 || x > cols * cellSize) continue;
+
+	    // draw tick line
+	    ctx.beginPath();
+	    ctx.moveTo(x, 0);
+	    ctx.lineTo(x, 3);
+	    ctx.stroke();
+
+	    // rotate text
+	    ctx.save();
+	    ctx.translate(x, 6);
+	    ctx.rotate(-Math.PI / 4);
+	    ctx.fillText((az % 360).toString(), 0, 0);
+	    ctx.restore();
+	  }
+
+	  // Y-axis ticks every 5°
+	  ctx.textAlign = 'right';
+	  ctx.textBaseline = 'middle';
+	  for(let el=0; el<=90; el+=5){
+	    const y = -(el/90)*rows*cellSize;
+	    ctx.beginPath();
+	    ctx.moveTo(-3,y); ctx.lineTo(0,y); ctx.stroke();
+	    // Adjusted position for text separation
+	    ctx.fillText(el.toString(), -8, y);
+	  }
+
+	  return canvas;
+	}
+
+	async function createVesselCanvasForPDF() {
+	  const img = new Image();
+	  img.crossOrigin = "anonymous";
+	  img.src = vesselImg.src;
+	  await new Promise(resolve => img.onload = resolve);
+
+	  const rect = vesselImg.getBoundingClientRect();
+
+	  // ➡️ Solution: Use the minimum dimension to create a perfect square canvas
+	  const size = Math.min(rect.width, rect.height);
+
+	  const canvas = document.createElement('canvas');
+	  // Set canvas dimensions to be square to prevent distortion
+	  canvas.width = size * 2;
+	  canvas.height = size * 2;
+	  const ctx = canvas.getContext('2d');
+	  ctx.scale(2, 2);
+
+	  // ---- draw vessel with same shadow as live view ----
+	  ctx.save();
+	  ctx.shadowColor = 'rgba(0,0,0,0.25)';
+	  ctx.shadowBlur = 20;
+	  ctx.shadowOffsetX = 0;
+	  ctx.shadowOffsetY = 4;
+	  
+	  // ➡️ Draw the image centered within the new square canvas
+	  const imgX = (size - rect.width) / 2;
+	  const imgY = (size - rect.height) / 2;
+	  ctx.drawImage(img, imgX, imgY, rect.width, rect.height);
+	  ctx.restore();
+
+	  // ---- draw arcs identical to browser ----
+	  const cx = size / 2; // Center based on the new square size
+	  const cy = size / 2;
+	  const R = Math.min(rect.width, rect.height) * 0.42;
+
+	  Array.from(zonesBody.querySelectorAll('tr')).forEach((row, idx) => {
+		const start = parseFloat(row.cells[0].querySelector('input').value);
+		const stop = parseFloat(row.cells[1].querySelector('input').value);
+		const el = parseFloat(row.cells[2].querySelector('input').value);
+		if (isNaN(start) || isNaN(stop)) return;
+
+		const startRad = (start - 90) * Math.PI / 180;
+		const stopRad = (stop - 90) * Math.PI / 180;
+		const elClamped = Math.min(Math.max(el, 0), 90);
+		const opacity = 0.2 + (elClamped / 90) * 0.6;
+
+		ctx.save();
+		ctx.shadowColor = 'rgba(0,0,0,0.3)';
+		ctx.shadowBlur = 8;
+		ctx.shadowOffsetX = 0;
+		ctx.shadowOffsetY = 0;
+
+		ctx.beginPath();
+		ctx.moveTo(cx, cy);
+		ctx.arc(cx, cy, R, startRad, stopRad, false);
+		ctx.closePath();
+		ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
+		ctx.fill();
+		ctx.restore();
+
+		let midAngle;
+		if (stop < start) {
+		  midAngle = ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2;
+		} else {
+		  midAngle = (startRad + stopRad) / 2;
+		}
+
+		const labelX = cx + Math.cos(midAngle) * R * 0.7;
+		const labelY = cy + Math.sin(midAngle) * R * 0.7;
+		ctx.fillStyle = 'black';
+		ctx.font = '12px sans-serif';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillText(`${Math.round(el)}°`, labelX, labelY);
+	  });
+
+	  return canvas;
+	}
+
+		const gridClone = document.getElementById('grid').cloneNode(true);
+		const centerCellClone = gridClone.querySelector('#cell-5');
+		centerCellClone.innerHTML = '';
+		const vesselCanvas = await createVesselCanvasForPDF();
+		const imgEl = document.createElement('img');
+		imgEl.src = vesselCanvas.toDataURL('image/png');
+		centerCellClone.appendChild(imgEl);
+
+		pdfContainer.appendChild(gridClone);
+
+		document.body.appendChild(pdfContainer);
+		
+		const canvas = await html2canvas(pdfContainer, {
+		scale: 2,
+		useCORS: true,
+		// Attempt to explicitly handle shadows
+		// This may not work on all devices but is a good practice to try
+		ignoreElements: (element) => {
+			// You can add logic here to ignore elements that are causing issues
+			return false; // return true to ignore, false to render
+		},
+		onrendered: function(canvas) {
+			// You can inspect the rendered canvas here
+		}
+	});
+		
+		const imgData = canvas.toDataURL('image/jpeg',0.95);
+		const {jsPDF} = window.jspdf;
+		const pdf = new jsPDF('p','mm','a4');
+		const pageWidth = 210;
+		const pageHeight = 297;
+		const imgWidth = pageWidth;
+		const imgHeight = (canvas.height*imgWidth)/canvas.width;
+		const posY = (pageHeight - imgHeight)/2;
+		pdf.addImage(imgData,'JPEG',0,posY,imgWidth,imgHeight);
+		// Get input values and sanitize them for filename
+
+		const cleanDate = dateVal.replace(/-/g,''); // <-- added
+		const fileName = `${vesselNameVal}_BlockageChart_${antennaLocVal}_${cleanDate}.pdf`
+		  .replace(/[\/\\?%*:|"<>]/g, '_');
+
+	pdf.save(fileName);
+
+		pdfContainer.remove();
+	  } catch(err) {
+		console.error("PDF generation failed:", err);
+		alert("PDF generation failed. Check console for details.");
+	  }
+	});
+
+	document.getElementById('vesselName').addEventListener('change', (event) => {
+		let value = event.target.value.trim();
+
+		// Regular expression to match 3 capital letters
+		const prefixRegex = /^[A-Z]{3}_/;
+		let prefix = '';
+		let namePart = value;
+
+		// Check if the input already has the "ABC_" prefix
+		if (prefixRegex.test(value)) {
+			// If it does, extract the prefix and the rest of the name
+			prefix = value.substring(0, 4);
+			namePart = value.substring(4);
+		} else if (value.length >= 3) {
+			// If not, assume the first 3 characters are the prefix
+			prefix = value.substring(0, 3).toUpperCase() + '_';
+			namePart = value.substring(3);
+		}
+
+		// Split the name part into words
+		let words = namePart.split(/\s+/);
+		let formattedWords = words.map(word => {
+			if (word.length === 0) return '';
+			// Capitalize the first letter and make the rest lowercase
+			return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+		});
+
+		// Join the words **without** spaces and set the formatted value
+		event.target.value = prefix + formattedWords.join(''); // Changed from .join(' ') to .join('')
+	});
+
+	window.addEventListener('DOMContentLoaded',resizeOverlay);
+	</script>
+	</body>
+	</html>
