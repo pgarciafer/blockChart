@@ -146,13 +146,15 @@ function resizeOverlay() {
 }
 
 
-
 function drawZones() {
   const ctx = overlayCtx;
   const rect = vesselImg.getBoundingClientRect();
-  const cx = rect.width / 2;
-  const cy = rect.height / 2;
-  const radius = Math.min(rect.width, rect.height) * 0.42; // ensures circle shape
+  
+  // Make a square overlay based on the smaller dimension
+  const size = Math.min(rect.width, rect.height);
+  const cx = size / 2;
+  const cy = size / 2;
+  const R = size * 0.42; // circle radius
 
   ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
@@ -161,11 +163,11 @@ function drawZones() {
     const start = parseFloat(row.cells[0].querySelector('input').value) || 0;
     const stop = parseFloat(row.cells[1].querySelector('input').value) || 0;
     const el = parseFloat(row.cells[2].querySelector('input').value) || 0;
+    const elClamped = Math.min(Math.max(el, 0), 90);
+    const opacity = 0.2 + (elClamped / 90) * 0.6;
 
     const startRad = (start - 90) * Math.PI / 180;
     const stopRad = (stop - 90) * Math.PI / 180;
-    const elClamped = Math.min(Math.max(el, 0), 90);
-    const opacity = 0.2 + (elClamped / 90) * 0.6;
 
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.3)';
@@ -175,7 +177,7 @@ function drawZones() {
 
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, radius, startRad, stopRad, false);
+    ctx.arc(cx, cy, R, startRad, stopRad, false);
     ctx.closePath();
     ctx.fillStyle = `rgba(255,0,0,${opacity})`;
     ctx.fill();
@@ -188,8 +190,8 @@ function drawZones() {
     } else {
       midAngle = (startRad + stopRad) / 2;
     }
-    const labelX = cx + Math.cos(midAngle) * radius * 0.7;
-    const labelY = cy + Math.sin(midAngle) * radius * 0.7;
+    const labelX = cx + Math.cos(midAngle) * R * 0.7;
+    const labelY = cy + Math.sin(midAngle) * R * 0.7;
     ctx.fillStyle = 'black';
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
@@ -197,8 +199,6 @@ function drawZones() {
     ctx.fillText(`${Math.round(el)}°`, labelX, labelY);
   });
 }
-
-
 
 
 document.getElementById('antennaLocation').addEventListener('input', (event) => {
@@ -439,7 +439,6 @@ document.getElementById('submittedBy').addEventListener('change', (event) => {
 	  return canvas;
 	}
 	
-	
 async function createVesselCanvasForPDF() {
   const img = new Image();
   img.crossOrigin = "anonymous";
@@ -448,21 +447,23 @@ async function createVesselCanvasForPDF() {
 
   const rect = vesselImg.getBoundingClientRect();
 
+  // ---- Make a square canvas to keep arcs circular ----
+  const size = Math.min(rect.width, rect.height);
   const canvas = document.createElement('canvas');
-  canvas.width = rect.width * 2;   // double resolution for PDF
-  canvas.height = rect.height * 2;
+  canvas.width = size * 2;  // double resolution for PDF
+  canvas.height = size * 2;
   const ctx = canvas.getContext('2d');
   ctx.scale(2, 2);
 
-  // Draw vessel image as-is (rectangular)
+  // ---- Draw vessel image in original dimensions (may be rectangular) ----
   ctx.drawImage(img, 0, 0, rect.width, rect.height);
 
-  // Draw blockage zones as circular arcs
-  const cx = rect.width / 2;
-  const cy = rect.height / 2;
-  const R = Math.min(rect.width, rect.height) * 0.42; // circle radius
+  // ---- Draw circular blockage zones ----
+  const cx = size / 2;
+  const cy = size / 2;
+  const R = size * 0.42; // radius based on square overlay
 
-  Array.from(zonesBody.querySelectorAll('tr')).forEach(row => {
+  Array.from(zonesBody.querySelectorAll('tr')).forEach((row) => {
     const start = parseFloat(row.cells[0].querySelector('input').value);
     const stop = parseFloat(row.cells[1].querySelector('input').value);
     const el = parseFloat(row.cells[2].querySelector('input').value);
@@ -483,11 +484,11 @@ async function createVesselCanvasForPDF() {
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, R, startRad, stopRad, false);
     ctx.closePath();
-    ctx.fillStyle = `rgba(255,0,0,${opacity})`;
+    ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
     ctx.fill();
     ctx.restore();
 
-    // optional: draw EL label
+    // Optional: draw EL label
     let midAngle;
     if (stop < start) {
       midAngle = ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2;
@@ -505,7 +506,6 @@ async function createVesselCanvasForPDF() {
 
   return canvas;
 }
-
 
 
 		const gridClone = document.getElementById('grid').cloneNode(true);
