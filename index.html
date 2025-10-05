@@ -4,7 +4,7 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width,initial-scale=1" />
 	<title>Blockage Chart</title>
-	<link rel="icon" href="https://raw.githubusercontent.com/pgarciafer/blockChart/main/logo1.png" type="image/png">
+	<link rel="icon" href="https://raw.githubusercontent.com/pgarciafer/pics2PDF/main/logo1.png" type="image/png">
 	<style>
 	body { font-family: sans-serif; text-align:center; padding:20px; background:#f5f5f5; }
 	.card { max-width:950px; margin:auto; background:white; border-radius:12px; padding:18px; }
@@ -131,23 +131,21 @@
 function resizeOverlay() {
   const rect = vesselImg.getBoundingClientRect();
 
-  // Make overlay canvas square, based on the smaller dimension of the vessel image
+  // Overlay size = min(width, height) to make arcs circular
   const size = Math.min(rect.width, rect.height);
-  overlayCanvas.width = size * window.devicePixelRatio;  // high-DPI for sharpness
-  overlayCanvas.height = size * window.devicePixelRatio;
-
-  // Scale context for high-DPI
-  overlayCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
-
-  // Center the canvas over the vessel image
-  overlayCanvas.style.position = 'absolute';
-  overlayCanvas.style.left = ((rect.width - size) / 2) + 'px';
-  overlayCanvas.style.top = ((rect.height - size) / 2) + 'px';
+  overlayCanvas.width = size;
+  overlayCanvas.height = size;
   overlayCanvas.style.width = size + 'px';
   overlayCanvas.style.height = size + 'px';
 
+  // Center overlay over vessel image
+  overlayCanvas.style.left = ((rect.width - size) / 2) + 'px';
+  overlayCanvas.style.top = ((rect.height - size) / 2) + 'px';
+
+  overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
   drawZones();
 }
+
 
 
 function drawZones() {
@@ -295,16 +293,33 @@ document.getElementById('submittedBy').addEventListener('change', (event) => {
 		const dateVal = document.getElementById('dateInput').value;
 		const submittedByVal = document.getElementById('submittedBy').value.trim(); // <-- Added
 
-	    if(vesselNameVal || antennaLocVal || dateVal || submittedByVal){ // <-- Updated condition
-	      const infoDiv = document.createElement('div');
-	      infoDiv.style.textAlign = 'center';
-	      infoDiv.style.marginBottom = '8px';
-	      if(vesselNameVal) infoDiv.innerHTML += `<div><strong>Vessel:</strong> ${vesselNameVal}</div>`;
-	      if(antennaLocVal) infoDiv.innerHTML += `<div><strong>Antenna & Location:</strong> ${antennaLocVal}</div>`;
-		  if(dateVal) infoDiv.innerHTML += `<div><strong>Date:</strong> ${dateVal}</div>`;
-		  if(submittedByVal) infoDiv.innerHTML += `<div><strong>Submitted by:</strong> ${submittedByVal}</div>`; // <-- Added
-	      pdfContainer.appendChild(infoDiv);
-	    }
+if (vesselNameVal || antennaLocVal || dateVal || submittedByVal) {
+  const infoDiv = document.createElement('div');
+  infoDiv.style.display = 'flex';
+  infoDiv.style.alignItems = 'center';
+  infoDiv.style.justifyContent = 'center'; // <-- center the whole block
+  infoDiv.style.marginBottom = '12px';
+
+  // Logo
+  const logoImg = document.createElement('img');
+  logoImg.src = 'https://raw.githubusercontent.com/pgarciafer/blockChart/main/logo.png';
+  logoImg.style.height = '50px'; // adjust as needed
+  logoImg.style.marginRight = '12px';
+  infoDiv.appendChild(logoImg);
+
+  // Info texts
+  const textDiv = document.createElement('div');
+  textDiv.style.textAlign = 'left';
+  if(vesselNameVal) textDiv.innerHTML += `<div><strong>Vessel:</strong> ${vesselNameVal}</div>`;
+  if(antennaLocVal) textDiv.innerHTML += `<div><strong>Antenna & Location:</strong> ${antennaLocVal}</div>`;
+  if(dateVal) textDiv.innerHTML += `<div><strong>Date:</strong> ${dateVal}</div>`;
+  if(submittedByVal) textDiv.innerHTML += `<div><strong>Submitted by:</strong> ${submittedByVal}</div>`;
+
+  infoDiv.appendChild(textDiv);
+  pdfContainer.appendChild(infoDiv);
+}
+
+
 
 		const rows = Array.from(zonesBody.querySelectorAll('tr'));
 	if (rows.length > 0) {
@@ -443,25 +458,26 @@ async function createVesselCanvasForPDF() {
   img.src = vesselImg.src;
   await new Promise(resolve => img.onload = resolve);
 
-  const rect = vesselImg.getBoundingClientRect();
+  // Get the natural dimensions of the vessel image
+  const width = img.naturalWidth;
+  const height = img.naturalHeight;
 
-  // ---- Make a square canvas to keep arcs circular ----
-  const size = Math.min(rect.width, rect.height);
+  // Canvas size = same as vessel image
   const canvas = document.createElement('canvas');
-  canvas.width = size * 2;  // double resolution for PDF
-  canvas.height = size * 2;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d');
-  ctx.scale(2, 2);
 
-  // ---- Draw vessel image in original dimensions (may be rectangular) ----
-  ctx.drawImage(img, 0, 0, rect.width, rect.height);
+  // Draw the vessel image at natural size
+  ctx.drawImage(img, 0, 0, width, height);
 
-  // ---- Draw circular blockage zones ----
+  // Draw circular block zones on a square overlay
+  const size = Math.min(width, height);
   const cx = size / 2;
   const cy = size / 2;
-  const R = size * 0.42; // radius based on square overlay
+  const R = size * 0.42;
 
-  Array.from(zonesBody.querySelectorAll('tr')).forEach((row) => {
+  Array.from(zonesBody.querySelectorAll('tr')).forEach(row => {
     const start = parseFloat(row.cells[0].querySelector('input').value);
     const stop = parseFloat(row.cells[1].querySelector('input').value);
     const el = parseFloat(row.cells[2].querySelector('input').value);
@@ -486,13 +502,10 @@ async function createVesselCanvasForPDF() {
     ctx.fill();
     ctx.restore();
 
-    // Optional: draw EL label
-    let midAngle;
-    if (stop < start) {
-      midAngle = ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2;
-    } else {
-      midAngle = (startRad + stopRad) / 2;
-    }
+    // Optional EL label
+    let midAngle = (stop < start)
+      ? ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2
+      : (startRad + stopRad) / 2;
     const labelX = cx + Math.cos(midAngle) * R * 0.7;
     const labelY = cy + Math.sin(midAngle) * R * 0.7;
     ctx.fillStyle = 'black';
@@ -504,6 +517,7 @@ async function createVesselCanvasForPDF() {
 
   return canvas;
 }
+
 
 
 		const gridClone = document.getElementById('grid').cloneNode(true);
