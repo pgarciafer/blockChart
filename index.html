@@ -424,9 +424,10 @@ async function createVesselCanvasForPDF() {
   ctx.scale(2, 2);
 
   // ---- draw vessel with same shadow as live view ----
+// Try these values for more consistency across devices
 ctx.save();
-ctx.shadowColor = 'rgba(0,0,0,0.25)';
-ctx.shadowBlur = 20;
+ctx.shadowColor = 'rgba(0,0,0,0.4)'; // Slightly darker shadow
+ctx.shadowBlur = 10; // Reduced blur amount
 ctx.shadowOffsetX = 0;
 ctx.shadowOffsetY = 4;
 ctx.drawImage(img, 0, 0, rect.width, rect.height);
@@ -449,10 +450,10 @@ ctx.restore();
     const opacity = 0.2 + (elClamped / 90) * 0.8;   // same opacity logic
 
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.3)';            // same soft shadow
-    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';            // same soft shadow
+    ctx.shadowBlur = 10;
     ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
+    ctx.shadowOffsetY = 4;
 
     ctx.beginPath();
     ctx.moveTo(cx, cy);
@@ -525,6 +526,37 @@ pdf.save(fileName);
     console.error("PDF generation failed:", err);
     alert("PDF generation failed. Check console for details.");
   }
+});
+
+document.getElementById('vesselName').addEventListener('change', (event) => {
+    let value = event.target.value.trim();
+
+    // Regular expression to match 3 capital letters
+    const prefixRegex = /^[A-Z]{3}_/;
+    let prefix = '';
+    let namePart = value;
+
+    // Check if the input already has the "ABC_" prefix
+    if (prefixRegex.test(value)) {
+        // If it does, extract the prefix and the rest of the name
+        prefix = value.substring(0, 4);
+        namePart = value.substring(4);
+    } else if (value.length >= 3) {
+        // If not, assume the first 3 characters are the prefix
+        prefix = value.substring(0, 3).toUpperCase() + '_';
+        namePart = value.substring(3);
+    }
+
+    // Split the name part into words
+    let words = namePart.split(/\s+/);
+    let formattedWords = words.map(word => {
+        if (word.length === 0) return '';
+        // Capitalize the first letter and make the rest lowercase
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    });
+
+    // Join the words **without** spaces and set the formatted value
+    event.target.value = prefix + formattedWords.join(''); // Changed from .join(' ') to .join('')
 });
 
 window.addEventListener('DOMContentLoaded',resizeOverlay);
