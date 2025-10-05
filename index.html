@@ -127,15 +127,24 @@
 
 	function formatNumber(num){return(Math.round(num*100)/100).toString().replace(/\.00$/,'');}
 
-	function resizeOverlay(){
-	  const rect = vesselImg.getBoundingClientRect();
-	  overlayCanvas.width = rect.width;
-	  overlayCanvas.height = rect.height;
-	  overlayCanvas.style.width = rect.width + 'px';
-	  overlayCanvas.style.height = rect.height + 'px';
-	  overlayCtx.setTransform(1,0,0,1,0,0);
-	  drawZones();
-	}
+function resizeOverlay() {
+  const rect = vesselImg.getBoundingClientRect();
+
+  // Make overlay canvas square, size = min(width, height)
+  const size = Math.min(rect.width, rect.height);
+  overlayCanvas.width = size;
+  overlayCanvas.height = size;
+  overlayCanvas.style.width = size + 'px';
+  overlayCanvas.style.height = size + 'px';
+
+  // Center the square canvas over the vessel image
+  overlayCanvas.style.left = ((rect.width - size) / 2) + 'px';
+  overlayCanvas.style.top = ((rect.height - size) / 2) + 'px';
+
+  overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
+  drawZones();
+}
+
 
 
 function drawZones() {
