@@ -4,6 +4,7 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width,initial-scale=1" />
 	<title>Blockage Chart</title>
+	<link rel="icon" href="https://raw.githubusercontent.com/pgarciafer/blockChart/main/logo1.png" type="image/png">
 	<style>
 	body { font-family: sans-serif; text-align:center; padding:20px; background:#f5f5f5; }
 	.card { max-width:950px; margin:auto; background:white; border-radius:12px; padding:18px; }
@@ -130,44 +131,43 @@
 function resizeOverlay() {
   const rect = vesselImg.getBoundingClientRect();
 
-  // Make overlay canvas square, size = min(width, height)
+  // Make overlay canvas square, based on the smaller dimension of the vessel image
   const size = Math.min(rect.width, rect.height);
-  overlayCanvas.width = size;
-  overlayCanvas.height = size;
+  overlayCanvas.width = size * window.devicePixelRatio;  // high-DPI for sharpness
+  overlayCanvas.height = size * window.devicePixelRatio;
+
+  // Scale context for high-DPI
+  overlayCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+
+  // Center the canvas over the vessel image
+  overlayCanvas.style.position = 'absolute';
+  overlayCanvas.style.left = ((rect.width - size) / 2) + 'px';
+  overlayCanvas.style.top = ((rect.height - size) / 2) + 'px';
   overlayCanvas.style.width = size + 'px';
   overlayCanvas.style.height = size + 'px';
 
-  // Center the square canvas over the vessel image
-  overlayCanvas.style.left = ((rect.width - size) / 2) + 'px';
-  overlayCanvas.style.top = ((rect.height - size) / 2) + 'px';
-
-  overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
   drawZones();
 }
 
 
 function drawZones() {
   const ctx = overlayCtx;
-  const rect = vesselImg.getBoundingClientRect();
-  
-  // Make a square overlay based on the smaller dimension
-  const size = Math.min(rect.width, rect.height);
+  const size = overlayCanvas.width / window.devicePixelRatio;
   const cx = size / 2;
   const cy = size / 2;
   const R = size * 0.42; // circle radius
 
-  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  ctx.clearRect(0, 0, size, size);
 
   const rows = zonesBody.querySelectorAll('tr');
   rows.forEach(row => {
     const start = parseFloat(row.cells[0].querySelector('input').value) || 0;
     const stop = parseFloat(row.cells[1].querySelector('input').value) || 0;
-    const el = parseFloat(row.cells[2].querySelector('input').value) || 0;
-    const elClamped = Math.min(Math.max(el, 0), 90);
-    const opacity = 0.2 + (elClamped / 90) * 0.6;
+    const el = Math.min(Math.max(parseFloat(row.cells[2].querySelector('input').value) || 0, 0), 90);
+    const opacity = 0.2 + (el / 90) * 0.6;
 
     const startRad = (start - 90) * Math.PI / 180;
-    const stopRad = (stop - 90) * Math.PI / 180;
+    const stopRad  = (stop  - 90) * Math.PI / 180;
 
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.3)';
@@ -183,13 +183,11 @@ function drawZones() {
     ctx.fill();
     ctx.restore();
 
-    // optional: draw EL label
-    let midAngle;
-    if (stop < start) {
-      midAngle = ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2;
-    } else {
-      midAngle = (startRad + stopRad) / 2;
-    }
+    // EL label
+    let midAngle = stop < start
+      ? ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2
+      : (startRad + stopRad) / 2;
+
     const labelX = cx + Math.cos(midAngle) * R * 0.7;
     const labelY = cy + Math.sin(midAngle) * R * 0.7;
     ctx.fillStyle = 'black';
@@ -589,7 +587,11 @@ async function createVesselCanvasForPDF() {
 		event.target.value = prefix + formattedWords.join(''); // Changed from .join(' ') to .join('')
 	});
 
+window.addEventListener('resize', resizeOverlay);
 	window.addEventListener('DOMContentLoaded',resizeOverlay);
+	
+	
+
 	</script>
 	</body>
 	</html>
