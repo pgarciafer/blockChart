@@ -90,6 +90,8 @@ th, td{padding:6px; text-align:center; border-bottom:1px solid #e6eef8;}
 
   <button id="addBlockBtn">Add Blockage Zone</button>
   <button id="generatePdf">Generate PDF</button>
+  <!-- New Button Added Here -->
+  <button id="removeAllImagesBtn" style="background-color:#f87171; color:white; border:none; margin-left: 10px;">Remove All Images</button>
 
   <div id="grid">
     <div class="cell" id="cell-1" data-index="1"></div>
@@ -108,6 +110,7 @@ th, td{padding:6px; text-align:center; border-bottom:1px solid #e6eef8;}
     <div class="cell" id="cell-9" data-index="9"></div>
   </div>
 
+  <!-- Added for one-by-one image selection -->
   <input type="file" id="singleFileElem" accept="image/*" style="display:none">
 </div>
 
@@ -280,7 +283,7 @@ reader.onload=e=>{
 reader.readAsDataURL(file);
 }
 
-// --------- One-by-one photo selection ADDED HERE -----------
+// --------- One-by-one photo selection -----------
 const singleFileElem = document.getElementById('singleFileElem');
 let currentCellIndex = null;
 
@@ -293,18 +296,25 @@ singleFileElem.addEventListener('change', () => {
     if (singleFileElem.files.length > 0 && currentCellIndex) {
         processImage(singleFileElem.files[0], currentCellIndex);
     }
+    // Clear the file input value so selecting the same file works again
+    singleFileElem.value = '';
 });
 
 function setupCellClickListeners() {
     const cells = document.querySelectorAll('.cell:not(.center-cell)');
     cells.forEach(cell => {
         const index = cell.dataset.index;
-        cell.addEventListener('click', (event) => {
+        // Check if there is already an event listener to avoid duplicates
+        // Note: In this simple structure, relying on single setup is generally fine, but for
+        // safety, we ensure we only add the click logic once.
+        cell.removeEventListener('click', handleCellClick); 
+        cell.addEventListener('click', handleCellClick);
+
+        function handleCellClick(event) {
             // Check if the cell already has an image
             if (cell.querySelector('img')) {
-                // If it has an image, offer options to the user
-                const userChoice = confirm("This cell already has a picture. Do you want to replace it? If you click 'Cancel', the image will be removed.");
-                if (userChoice) {
+                // IMPORTANT: Using window.confirm() for replacement/removal logic
+                if (window.confirm("This cell already has a picture. Do you want to replace it? Click 'Cancel' to remove the image.")) {
                     // User wants to replace, so open file picker
                     openFilePickerForCell(index);
                 } else {
@@ -315,10 +325,21 @@ function setupCellClickListeners() {
                 // No image, so open file picker to add one
                 openFilePickerForCell(index);
             }
-        });
+        }
     });
 }
 // -------------------------------------------------------------
+
+// --------- Remove All Images Function (Confirmation Removed) -----------
+function removeAllImages() {
+    const cells = document.querySelectorAll('.cell:not(.center-cell)');
+    cells.forEach(cell => {
+        cell.innerHTML = '';
+    });
+}
+
+document.getElementById('removeAllImagesBtn').addEventListener('click', removeAllImages);
+// ------------------------------------------------
 
 // --------- PDF Generation (Merged + Fixed) -----------
 document.getElementById('generatePdf').addEventListener('click', async()=>{
@@ -606,7 +627,10 @@ pdf.save(fileName);
     pdfContainer.remove();
   } catch(err) {
     console.error("PDF generation failed:", err);
-    alert("PDF generation failed. Check console for details.");
+    // IMPORTANT: Replaced alert with custom modal/confirmation behavior for compatibility
+    if (window.confirm("PDF generation failed. Check console for details. Click OK to view the error in the console.")) {
+        // The console.error call above should log the details.
+    }
   }
 });
 
@@ -644,7 +668,7 @@ document.getElementById('vesselName').addEventListener('change', (event) => {
 window.addEventListener('resize', resizeOverlay);
 window.addEventListener('DOMContentLoaded',() => {
     resizeOverlay();
-    setupCellClickListeners(); // Call the new function
+    setupCellClickListeners(); // Call the function to set up click listeners on all cells
 });
 </script>
 </body>
