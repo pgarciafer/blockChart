@@ -299,8 +299,22 @@ function setupCellClickListeners() {
     const cells = document.querySelectorAll('.cell:not(.center-cell)');
     cells.forEach(cell => {
         const index = cell.dataset.index;
-        cell.addEventListener('click', () => {
-            openFilePickerForCell(index);
+        cell.addEventListener('click', (event) => {
+            // Check if the cell already has an image
+            if (cell.querySelector('img')) {
+                // If it has an image, offer options to the user
+                const userChoice = confirm("This cell already has a picture. Do you want to replace it? If you click 'Cancel', the image will be removed.");
+                if (userChoice) {
+                    // User wants to replace, so open file picker
+                    openFilePickerForCell(index);
+                } else {
+                    // User wants to remove the image
+                    cell.innerHTML = '';
+                }
+            } else {
+                // No image, so open file picker to add one
+                openFilePickerForCell(index);
+            }
         });
     });
 }
