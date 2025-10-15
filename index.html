@@ -26,9 +26,41 @@ body { font-family: sans-serif; text-align:center; padding:20px; background:#f5f
     position: relative;
 }
 
-.cell { background:#eee; display:flex; justify-content:center; align-items:center; overflow:hidden; position:relative; border-radius:6px; cursor:pointer; }
-.cell img { width:100%; height:100%; object-fit:cover; }
-.center-cell { background:white; position:relative; }
+.cell { 
+    background:#eee; 
+    display:flex; 
+    justify-content:center; 
+    align-items:center; 
+    overflow:hidden; 
+    position:relative; 
+    border-radius:6px; 
+    cursor:pointer; 
+    /* Ensures number is readable */
+    font-size: 2.5rem; 
+    font-weight: bold;
+    color: #b0b0b0; /* Light grey for the number */
+}
+.cell img { 
+    width:100%; 
+    height:100%; 
+    object-fit:cover; 
+}
+/* Hide the number when an image is present */
+.cell:has(img) {
+    font-size: 0; /* Hide font content when image is present */
+}
+
+.center-cell { 
+    background:white; 
+    position:relative; 
+    cursor: default; /* Center cell is not clickable for images */
+}
+
+/* Remove number styling from center cell */
+.center-cell .cell-number {
+    display: none; 
+}
+
 button { padding:10px 20px; margin-top:10px; }
 table{width:100%; border-collapse:collapse; margin-top:8px;}
 th, td{padding:6px; text-align:center; border-bottom:1px solid #e6eef8;}
@@ -90,24 +122,28 @@ th, td{padding:6px; text-align:center; border-bottom:1px solid #e6eef8;}
 
   <button id="addBlockBtn">Add Blockage Zone</button>
   <button id="generatePdf">Generate PDF</button>
-  <!-- New Button Added Here -->
   <button id="removeAllImagesBtn" style="background-color:#f87171; color:white; border:none; margin-left: 10px;">Remove All Images</button>
 
   <div id="grid">
-    <div class="cell" id="cell-1" data-index="1"></div>
-    <div class="cell" id="cell-2" data-index="2"></div>
-    <div class="cell" id="cell-3" data-index="3"></div>
-    <div class="cell" id="cell-4" data-index="4"></div>
+    <!-- Row 1: Top Row -->
+    <div class="cell" id="cell-1" data-index="1">8</div> <!-- Top Left (was 1, now 8) -->
+    <div class="cell" id="cell-2" data-index="2">1</div> <!-- Top Middle (was 2, now 1) -->
+    <div class="cell" id="cell-3" data-index="3">2</div> <!-- Top Right (was 3, now 2) -->
+    
+    <!-- Row 2: Middle Row -->
+    <div class="cell" id="cell-4" data-index="4">7</div> <!-- Middle Left (was 4, now 7) -->
     <div class="cell center-cell" id="cell-5" data-index="5">
       <div class="vessel-wrapper">
         <img id="vesselImage" crossorigin="anonymous" src="https://pgarciafer.github.io/satcalc/IMG_0585.PNG" alt="Vessel">
         <canvas id="overlayCanvas"></canvas>
       </div>
     </div>
-    <div class="cell" id="cell-6" data-index="6"></div>
-    <div class="cell" id="cell-7" data-index="7"></div>
-    <div class="cell" id="cell-8" data-index="8"></div>
-    <div class="cell" id="cell-9" data-index="9"></div>
+    <div class="cell" id="cell-6" data-index="6">3</div> <!-- Middle Right (was 6, now 3) -->
+    
+    <!-- Row 3: Bottom Row -->
+    <div class="cell" id="cell-7" data-index="7">6</div> <!-- Bottom Left (was 7, now 6) -->
+    <div class="cell" id="cell-8" data-index="8">5</div> <!-- Bottom Middle (was 8, now 5) -->
+    <div class="cell" id="cell-9" data-index="9">4</div> <!-- Bottom Right (was 9, now 4) -->
   </div>
 
   <!-- Added for one-by-one image selection -->
@@ -260,28 +296,44 @@ dropArea.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation();});
 dropArea.addEventListener("drop",e=>handleFiles(e.dataTransfer.files));
 dropArea.addEventListener("click",()=>fileInput.click());
 fileInput.addEventListener("change",()=>handleFiles(fileInput.files));
+
+// Maps the sequential 0-7 index from the file drop/browse function 
+// to the desired cell ID index (1-9) in a clockwise order starting at cell-2.
+// The placement order is defined by the fixed cell IDs (1-9).
 const placementOrder=[2,3,6,9,8,7,4,1];
-function handleFiles(files){Array.from(files).slice(0,8).forEach((file,i)=>processImage(file,placementOrder[i]));}
+
+/**
+ * Handles processing of image files and placing them into a specific cell.
+ * @param {File} file The image file.
+ * @param {number} index The data-index of the cell where the image should be placed.
+ */
 function processImage(file,index){
-const reader=new FileReader();
-reader.onload=e=>{
-  const img=new Image();
-  img.onload=()=>{
-    const canvas=document.createElement('canvas');
-    const ctx=canvas.getContext('2d');
-    const maxSize=600;
-    let {width,height}=img;
-    if(width>height){if(width>maxSize){height*=maxSize/width;width=maxSize;}}
-    else{if(height>maxSize){width*=maxSize/height;height=maxSize;}}
-    canvas.width=width; canvas.height=height; ctx.drawImage(img,0,0,width,height);
-    const compressed=canvas.toDataURL('image/jpeg',0.7);
-    const cell=document.getElementById(`cell-${index}`);
-    cell.innerHTML=""; const imgEl=document.createElement('img'); imgEl.src=compressed; cell.appendChild(imgEl);
-  };
-  img.src=e.target.result;
-};
-reader.readAsDataURL(file);
+    const reader=new FileReader();
+    reader.onload=e=>{
+        const img=new Image();
+        img.onload=()=>{
+            const canvas=document.createElement('canvas');
+            const ctx=canvas.getContext('2d');
+            const maxSize=600;
+            let {width,height}=img;
+            if(width>height){if(width>maxSize){height*=maxSize/width;width=maxSize;}}
+            else{if(height>maxSize){width*=maxSize/height;height=maxSize;}}
+            canvas.width=width; canvas.height=height; ctx.drawImage(img,0,0,width,height);
+            const compressed=canvas.toDataURL('image/jpeg',0.7);
+            const cell=document.getElementById(`cell-${index}`);
+            // Clearing innerHTML removes the number, image is then appended
+            cell.innerHTML=""; 
+            const imgEl=document.createElement('img'); 
+            imgEl.src=compressed; 
+            cell.appendChild(imgEl);
+        };
+        img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
 }
+
+function handleFiles(files){Array.from(files).slice(0,8).forEach((file,i)=>processImage(file,placementOrder[i]));}
+
 
 // --------- One-by-one photo selection -----------
 const singleFileElem = document.getElementById('singleFileElem');
@@ -301,25 +353,26 @@ singleFileElem.addEventListener('change', () => {
 });
 
 function setupCellClickListeners() {
+    // We only attach listeners to the 8 surrounding cells
     const cells = document.querySelectorAll('.cell:not(.center-cell)');
     cells.forEach(cell => {
         const index = cell.dataset.index;
+        const currentNumber = cell.innerHTML.trim(); // Get the current number for re-insertion
+        
         // Check if there is already an event listener to avoid duplicates
-        // Note: In this simple structure, relying on single setup is generally fine, but for
-        // safety, we ensure we only add the click logic once.
         cell.removeEventListener('click', handleCellClick); 
         cell.addEventListener('click', handleCellClick);
 
         function handleCellClick(event) {
-            // Check if the cell already has an image
+            // Check if the cell already has an image (i.e., innerHTML is empty or contains an <img>)
             if (cell.querySelector('img')) {
                 // IMPORTANT: Using window.confirm() for replacement/removal logic
                 if (window.confirm("This cell already has a picture. Do you want to replace it? Click 'Cancel' to remove the image.")) {
                     // User wants to replace, so open file picker
                     openFilePickerForCell(index);
                 } else {
-                    // User wants to remove the image
-                    cell.innerHTML = '';
+                    // User wants to remove the image, so we re-add the original display number
+                    cell.innerHTML = currentNumber; // Re-add the clockwise number (1-8)
                 }
             } else {
                 // No image, so open file picker to add one
@@ -330,11 +383,14 @@ function setupCellClickListeners() {
 }
 // -------------------------------------------------------------
 
-// --------- Remove All Images Function (Confirmation Removed) -----------
+// --------- Remove All Images Function -----------
 function removeAllImages() {
     const cells = document.querySelectorAll('.cell:not(.center-cell)');
     cells.forEach(cell => {
-        cell.innerHTML = '';
+        // Clear all content and re-add the correct clockwise number (1-8)
+        // We look at the innerHTML as defined in the HTML structure
+        const clockwiseNumber = cell.innerHTML.trim() || cell.dataset.index; // Fallback to data-index if empty
+        cell.innerHTML = clockwiseNumber;
     });
 }
 
