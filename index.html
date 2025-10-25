@@ -4,150 +4,422 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Blockage Chart</title>
-<link rel="icon" href="https://raw.githubusercontent.com/pgarciafer/pics2PDF/main/logo1.png" type="image/png">
+<link rel="icon" href="https://raw.githubusercontent.com/pgarciafer/MTNblockagechart/main/logo1.png" type="image/png">
 <style>
-body { font-family: sans-serif; text-align:center; padding:20px; background:#f5f5f5; }
-.card { max-width:950px; margin:auto; background:white; border-radius:12px; padding:18px; }
-#drop-area { border:2px dashed #666; border-radius:10px; padding:20px; background:#fff; margin-bottom:12px; cursor:pointer; }
-#drop-area.highlight { border-color:#2196f3; background:#e3f2fd; }
-#drop-area p { margin:0; }
+:root {
+  --primary-color: #005A9C;
+  --primary-hover: #004a80;
+  --secondary-color: #6c757d;
+  --secondary-hover: #5a6268;
+  --danger-color: #dc3545;
+  --danger-hover: #c82333;
+  --success-color: #28a745;
+  --bg-color: #f8f9fa;
+  --container-bg: #ffffff;
+  --text-color: #212529;
+  --text-muted: #6c757d;
+  --border-color: #dee2e6;
+  --card-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  --input-focus-shadow: 0 0 0 0.25rem rgba(0, 90, 156, 0.25);
+  --input-invalid-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg-color);
+  margin: 0;
+  padding: 24px;
+  min-height: 100vh;
+  color: var(--text-color);
+}
+
+.card {
+  max-width: 1400px;
+  margin: auto;
+  padding: 24px;
+  background: var(--container-bg);
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.app-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.main-content {
+  flex: 3;
+  min-width: 400px;
+}
+
+.preview-container {
+  flex: 2;
+  min-width: 300px;
+  position: sticky;
+  top: 24px;
+  align-self: flex-start;
+}
+
+#pdf-preview-content {
+  border: 1px solid var(--border-color);
+  background: #fdfdfd;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 80vh;
+  transform-origin: top center;
+}
+
+.main-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#pageLogo {
+    height: 60px;
+    display: block;
+}
+
+h1 {
+    margin: 0;
+    color: var(--primary-color);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+}
+
+.card-section {
+    background: #fafcff;
+    border: 1px solid #e9eef5;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-top: 0;
+    margin-bottom: 16px;
+    text-align: left;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+label {
+  display: block;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: left;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+input, select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  font-size: 15px;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  background-color: #fff;
+  color: var(--text-color);
+  width: 100%;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: var(--input-focus-shadow);
+}
+.mic-btn {
+    position: absolute;
+    right: 8px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: var(--text-muted);
+}
+.mic-btn:hover { color: var(--primary-color); }
+.mic-btn.is-listening { color: var(--danger-color); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+
+.header-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+#drop-area {
+  border: 2px dashed var(--border-color);
+  background: #fff;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  margin-bottom: 12px; 
+}
+
+#drop-area:hover, #drop-area.highlight {
+  border-color: var(--primary-color);
+  background: #f0f6ff;
+}
+#drop-area p {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.button-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 25px;
+}
+
 #grid {
-    width: 85%;
-    max-width: 650px; /* keeps grid from growing too large */
-    height: 650px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3, 1fr);
     gap: 8px;
-    margin: 0 auto; /* ensures horizontal centering */
+    margin: 0;
     background: white;
     padding: 8px;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     position: relative;
+    box-sizing: border-box;
 }
 
-.cell { 
-    background:#eee; 
-    display:flex; 
-    justify-content:center; 
-    align-items:center; 
-    overflow:hidden; 
-    position:relative; 
-    border-radius:6px; 
-    cursor:pointer; 
-    /* Ensures number is readable */
-    font-size: 2.5rem; 
+.cell {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    overflow:hidden;
+    position:relative;
+    border-radius:6px;
+    cursor:pointer;
+    font-size: 2.5rem;
     font-weight: bold;
-    color: #b0b0b0; /* Light grey for the number */
+    color: #ccc;
 }
-.cell img { 
-    width:100%; 
-    height:100%; 
-    object-fit:cover; 
+.cell img {
+    width:100%;
+    height:100%;
+    object-fit:cover;
 }
-/* Hide the number when an image is present */
 .cell:has(img) {
-    font-size: 0; /* Hide font content when image is present */
+    font-size: 0;
+    border: 1px solid #aaa;
+}
+.remove-img-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+    line-height: 24px;
+    text-align: center;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 10;
+}
+.cell:hover .remove-img-btn {
+    opacity: 1;
 }
 
-.center-cell { 
-    background:white; 
-    position:relative; 
-    cursor: default; /* Center cell is not clickable for images */
+.center-cell {
+    background:white;
+    position:relative;
+    cursor: crosshair;
+    border: none;
 }
+.center-cell .cell-number { display: none; }
 
-/* Remove number styling from center cell */
-.center-cell .cell-number {
-    display: none; 
+button {
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background-color 0.15s ease-in-out, transform 0.1s ease;
+  position: relative;
+  -webkit-appearance: none;
 }
+button:disabled { background-color: #ccc; cursor: not-allowed; transform: none; opacity: 0.7; }
+button:active:not(:disabled) { transform: scale(0.98); }
 
-button { padding:10px 20px; margin-top:10px; }
+#addBlockBtn, #generatePdf { background-color: var(--primary-color); color: white; border: none; }
+#addBlockBtn:hover:not(:disabled), #generatePdf:hover:not(:disabled) { background-color: var(--primary-hover); }
+
+#removeAllImagesBtn { background-color: white; color: var(--danger-color); border: 1px solid var(--danger-color); }
+#removeAllImagesBtn:hover:not(:disabled) { background-color: var(--danger-color); color: white; }
+
 table{width:100%; border-collapse:collapse; margin-top:8px;}
-th, td{padding:6px; text-align:center; border-bottom:1px solid #e6eef8;}
-#zonesTable td button{background:#ef4444;color:white;border-radius:4px;border:none;padding:4px 6px;}
-.zone-color{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;}
-.pdfTable { width:60%; border-collapse:collapse; margin: 0 auto 12px; }
-.pdfTable th, .pdfTable td { border:1px solid #aaa; padding:4px; text-align:center; }
+th, td{padding:8px 6px; text-align:center; border-bottom:1px solid var(--border-color);}
+th { color: var(--text-muted); font-size: 14px; text-align: left;}
+#zonesTable td button{ background: var(--danger-color); color:white; border-radius:4px; border:none; padding:4px 8px; font-weight: bold; font-size: 14px; }
+#zonesTable td button:hover { background: var(--danger-hover); }
+#zonesTable input { width: 100%; padding: 6px; text-align: center; box-sizing: border-box; }
 
-/* Shadow wrapper */
-.vessel-wrapper {
+.zone-color{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;}
+
+#vesselImage {
     position: relative;
     width: 100%;
     height: 100%;
-    border-radius: 6px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    background-image: url('https://pgarciafer.github.io/satcalc/IMG_0585.PNG');
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.35));
 }
-.vessel-wrapper img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    position: absolute;
-    left:0;
-    top:0;
-    z-index:1;
-    border-radius:6px;
+#overlayCanvas { position:absolute; top:0; left:0; width:100%; height:100%; z-index:2; }
+
+@media screen and (max-width: 900px) {
+    body { padding: 10px; }
+    .card { padding: 12px; }
+    .app-layout { flex-direction: column; }
+    .preview-container { position: static; }
+
+    .main-header { flex-direction: column; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; }
+    h1 { font-size: 1.5rem; }
+
+    .header-inputs { grid-template-columns: 1fr; }
+    .button-container { grid-template-columns: 1fr; }
 }
-#overlayCanvas { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2; }
+
+#blockagePanel:not(.has-zones) > div > table { display: none; }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 </style>
 </head>
 <body>
 <div class="card">
-  <h1>Blockage Chart</h1>
+  <header class="main-header">
+    <img src="https://raw.githubusercontent.com/pgarciafer/MTNblockagechart/main/logo.png" alt="MTN Logo" id="pageLogo">
+    <h1>Blockage Chart</h1>
+  </header>
 
-  <div style="margin-bottom:12px; text-align:center;">
-    <input id="vesselName" type="text" placeholder="3LC_VesselName" style="padding:6px 10px; margin-right:8px; width:200px; border-radius:6px; border:1px solid #ccc;">
-    <input id="antennaLocation" type="text" placeholder="Antenna & Location" style="padding:6px 10px; width:250px; border-radius:6px; border:1px solid #ccc;">
-<input id="dateInput" type="date" 
-         style="padding:6px 10px; border-radius:6px; border:1px solid #ccc;">  
-  <input id="submittedBy" type="text" placeholder="Tech Name" style="padding:6px 10px; border-radius:6px; border:1px solid #ccc;">
+  <div class="app-layout">
+    <main class="main-content">
+      <section class="card-section" id="vessel-info-section">
+        <h2 class="section-title">Vessel Information</h2>
+        <div class="header-inputs">
+          <div class="input-wrapper">
+            <input id="vesselName" type="text" placeholder="3LC_VesselName">
+            <button class="mic-btn" data-target="vesselName" aria-label="Use voice input for vessel name">🎤</button>
+          </div>
+          <div class="input-wrapper">
+            <input id="antennaLocation" type="text" placeholder="Antenna & Location">
+             <button class="mic-btn" data-target="antennaLocation" aria-label="Use voice input for antenna location">🎤</button>
+          </div>
+          <div class="input-wrapper">
+            <input id="dateInput" type="date">
+          </div>
+          <div class="input-wrapper">
+            <input id="submittedBy" type="text" placeholder="Tech Name">
+            <button class="mic-btn" data-target="submittedBy" aria-label="Use voice input for tech name">🎤</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card-section" id="blockage-zones-section">
+        <h2 class="section-title">Blockage Zones</h2>
+        <div class="panel" id="blockagePanel">
+           <p style="text-align:center;font-size:14px;color:var(--text-muted); margin-top: 0;">Click and drag on the vessel diagram to draw a blockage zone.</p>
+           <div style="overflow-x: auto; -webkit-overflow-scrolling: touch; margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px;">
+              <table id="zonesTable" style="min-width: 300px;">
+                <thead><tr><th>AZ Start</th><th>AZ Stop</th><th>EL</th><th></th></tr></thead>
+                <tbody id="zonesBody"></tbody>
+              </table>
+           </div>
+          <button id="addBlockBtn" style="width: 100%; margin-top: 12px;">Add Zone Manually</button>
+        </div>
+      </section>
+      
+      <section class="card-section" id="photos-section">
+        <h2 class="section-title">Supporting Photos</h2>
+        <label for="fileElem" id="drop-area">
+          <p>📸 Drop up to 8 photos here or click to browse</p>
+        </label>
+        <input type="file" id="fileElem" accept="image/*" multiple class="visually-hidden">
+        <div id="grid">
+            <div class="cell" id="cell-1" data-index="1">8</div>
+            <div class="cell" id="cell-2" data-index="2">1</div>
+            <div class="cell" id="cell-3" data-index="3">2</div>
+            <div class="cell" id="cell-4" data-index="4">7</div>
+            <div class="cell center-cell" id="cell-5" data-index="5">
+                <div id="vesselImage">
+                <canvas id="overlayCanvas"></canvas>
+                </div>
+            </div>
+            <div class="cell" id="cell-6" data-index="6">3</div>
+            <div class="cell" id="cell-7" data-index="7">6</div>
+            <div class="cell" id="cell-8" data-index="8">5</div>
+            <div class="cell" id="cell-9" data-index="9">4</div>
+        </div>
+      </section>
+
+      <section class="card-section" id="actions-section">
+         <h2 class="section-title">Actions</h2>
+         <div class="button-container">
+            <button id="generatePdf">Generate PDF</button>
+            <button id="removeAllImagesBtn">Remove All Images</button>
+        </div>
+      </section>
+
+    </main>
+    <aside class="preview-container">
+      <h2 class="section-title">Live PDF Preview</h2>
+      <div id="pdf-preview-content"></div>
+    </aside>
   </div>
 
-  <div class="controls">
-    <div class="panel">
-      <label>Blockage Zones (AZ Start / AZ Stop in degrees)</label>
-      <table id="zonesTable">
-        <thead><tr><th>AZ Start</th><th>AZ Stop</th><th>EL</th><th></th></tr></thead>
-        <tbody id="zonesBody"></tbody>
-      </table>
-      <div style="margin-top:8px;font-size:13px;color:#536878">
-        Add zones and they will be drawn over the center vessel. They are also included in the PDF.
-      </div>
-    </div>
-  </div>
-
-  <div id="drop-area">
-    <p>📸 Drop up to 8 photos here or click to browse</p>
-    <input type="file" id="fileElem" accept="image/*" multiple style="display:none">
-  </div>
-
-  <button id="addBlockBtn">Add Blockage Zone</button>
-  <button id="generatePdf">Generate PDF</button>
-  <button id="removeAllImagesBtn" style="background-color:#f87171; color:white; border:none; margin-left: 10px;">Remove All Images</button>
-
-  <div id="grid">
-    <!-- Row 1: Top Row -->
-    <div class="cell" id="cell-1" data-index="1">8</div> <!-- Top Left (was 1, now 8) -->
-    <div class="cell" id="cell-2" data-index="2">1</div> <!-- Top Middle (was 2, now 1) -->
-    <div class="cell" id="cell-3" data-index="3">2</div> <!-- Top Right (was 3, now 2) -->
-    
-    <!-- Row 2: Middle Row -->
-    <div class="cell" id="cell-4" data-index="4">7</div> <!-- Middle Left (was 4, now 7) -->
-    <div class="cell center-cell" id="cell-5" data-index="5">
-      <div class="vessel-wrapper">
-        <img id="vesselImage" crossorigin="anonymous" src="https://pgarciafer.github.io/satcalc/IMG_0585.PNG" alt="Vessel">
-        <canvas id="overlayCanvas"></canvas>
-      </div>
-    </div>
-    <div class="cell" id="cell-6" data-index="6">3</div> <!-- Middle Right (was 6, now 3) -->
-    
-    <!-- Row 3: Bottom Row -->
-    <div class="cell" id="cell-7" data-index="7">6</div> <!-- Bottom Left (was 7, now 6) -->
-    <div class="cell" id="cell-8" data-index="8">5</div> <!-- Bottom Middle (was 8, now 5) -->
-    <div class="cell" id="cell-9" data-index="9">4</div> <!-- Bottom Right (was 9, now 4) -->
-  </div>
-
-  <!-- Added for one-by-one image selection -->
-  <input type="file" id="singleFileElem" accept="image/*" style="display:none">
+  <input type="file" id="singleFileElem" accept="image/*" class="visually-hidden">
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -161,129 +433,191 @@ const dd = String(today.getDate()).padStart(2,'0');
 document.getElementById('dateInput').value = `${yyyy}-${mm}-${dd}`;
 
 // --------- Blockage Zones -----------
-const zoneColors = ["rgba(255,0,0,0.45)","rgba(0,128,255,0.45)","rgba(0,200,0,0.45)","rgba(255,165,0,0.45)","rgba(128,0,128,0.45)","rgba(255,20,147,0.45)"];
 const zonesBody=document.getElementById('zonesBody');
 const overlayCanvas=document.getElementById('overlayCanvas');
 const overlayCtx=overlayCanvas.getContext('2d');
 const vesselImg=document.getElementById('vesselImage');
 
+function validateZoneRow(tr) {
+    const startInput = tr.cells[0].querySelector('input');
+    const stopInput = tr.cells[1].querySelector('input');
+    const start = parseFloat(startInput.value);
+    const stop = parseFloat(stopInput.value);
+
+    if (isNaN(start) || isNaN(stop)) {
+        startInput.style.borderColor = '';
+        stopInput.style.borderColor = '';
+        return;
+    }
+
+    let angle = stop - start;
+    if (angle < 0) { angle += 360; }
+
+    if (angle > 180) {
+        startInput.style.borderColor = 'red';
+        stopInput.style.borderColor = 'red';
+    } else {
+        startInput.style.borderColor = '';
+        stopInput.style.borderColor = '';
+    }
+}
+
 function formatNumber(num){return(Math.round(num*100)/100).toString().replace(/\.00$/,'');}
 
 function resizeOverlay() {
-const rect = vesselImg.getBoundingClientRect();
-
-// Overlay size = min(width, height) to make arcs circular
-const size = Math.min(rect.width, rect.height);
-overlayCanvas.width = size;
-overlayCanvas.height = size;
-overlayCanvas.style.width = size + 'px';
-overlayCanvas.style.height = size + 'px';
-
-// Center overlay over vessel image
-overlayCanvas.style.left = ((rect.width - size) / 2) + 'px';
-overlayCanvas.style.top = ((rect.height - size) / 2) + 'px';
-
-overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
-drawZones();
+    const rect = vesselImg.getBoundingClientRect();
+    const size = Math.min(rect.width, rect.height);
+    overlayCanvas.width = size;
+    overlayCanvas.height = size;
+    overlayCanvas.style.width = size + 'px';
+    overlayCanvas.style.height = size + 'px';
+    overlayCanvas.style.left = ((rect.width - size) / 2) + 'px';
+    overlayCanvas.style.top = ((rect.height - size) / 2) + 'px';
+    overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
+    drawZones();
 }
 
 
-function drawZones() {
-const ctx = overlayCtx;
-const size = overlayCanvas.width / window.devicePixelRatio;
-const cx = size / 2;
-const cy = size / 2;
-const R = size * 0.42; // circle radius
+function drawZones(tempZone = null) {
+    const blockagePanel = document.getElementById('blockagePanel');
+    const rows = zonesBody.querySelectorAll('tr');
+    
+    blockagePanel.classList.toggle('has-zones', rows.length > 0 || tempZone);
 
-ctx.clearRect(0, 0, size, size);
+    const ctx = overlayCtx;
+    const size = overlayCanvas.width;
+    const cx = size / 2;
+    const cy = size / 2;
+    const R = size * 0.42;
 
-const rows = zonesBody.querySelectorAll('tr');
-rows.forEach(row => {
-const start = parseFloat(row.cells[0].querySelector('input').value) || 0;
-const stop = parseFloat(row.cells[1].querySelector('input').value) || 0;
-const el = Math.min(Math.max(parseFloat(row.cells[2].querySelector('input').value) || 0, 0), 90);
-const opacity = 0.2 + (el / 90) * 0.6;
+    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-const startRad = (start - 90) * Math.PI / 180;
-const stopRad  = (stop  - 90) * Math.PI / 180;
+    const drawArc = (start, stop, el) => {
+        const opacity = 0.2 + (el / 90) * 0.6;
+        const startRad = (start - 90) * Math.PI / 180;
+        const stopRad = (stop - 90) * Math.PI / 180;
 
-ctx.save();
-ctx.shadowColor = 'rgba(0,0,0,0.3)';
-ctx.shadowBlur = 8;
-ctx.shadowOffsetX = 0;
-ctx.shadowOffsetY = 0;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, R, startRad, stopRad, false);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(255,0,0,${opacity})`;
+        ctx.fill();
+        ctx.restore();
 
-ctx.beginPath();
-ctx.moveTo(cx, cy);
-ctx.arc(cx, cy, R, startRad, stopRad, false);
-ctx.closePath();
-ctx.fillStyle = `rgba(255,0,0,${opacity})`;
-ctx.fill();
-ctx.restore();
+        let midAngle = stop < start ?
+            ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2 :
+            (startRad + stopRad) / 2;
 
-// EL label
-let midAngle = stop < start
-  ? ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2
-  : (startRad + stopRad) / 2;
+        const labelX = cx + Math.cos(midAngle) * R * 0.7;
+        const labelY = cy + Math.sin(midAngle) * R * 0.7;
+        ctx.fillStyle = 'black';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${Math.round(el)}°`, labelX, labelY);
+    };
+    
+    rows.forEach(row => {
+        const start = parseFloat(row.cells[0].querySelector('input').value) || 0;
+        const stop = parseFloat(row.cells[1].querySelector('input').value) || 0;
+        const el = Math.min(Math.max(parseFloat(row.cells[2].querySelector('input').value) || 0, 0), 90);
+        drawArc(start, stop, el);
+    });
 
-const labelX = cx + Math.cos(midAngle) * R * 0.7;
-const labelY = cy + Math.sin(midAngle) * R * 0.7;
-ctx.fillStyle = 'black';
-ctx.font = '12px sans-serif';
-ctx.textAlign = 'center';
-ctx.textBaseline = 'middle';
-ctx.fillText(`${Math.round(el)}°`, labelX, labelY);
-});
+    if (tempZone) {
+        drawArc(tempZone.start, tempZone.stop, tempZone.el);
+    }
 }
 
-
-document.getElementById('antennaLocation').addEventListener('input', (event) => {
-event.target.value = event.target.value.toUpperCase();
-});
-
-document.getElementById('submittedBy').addEventListener('change', (event) => {
-let value = event.target.value.trim();
-
-// Split the input value into words
-let words = value.split(/\s+/);
-
-// Capitalize the first letter of each word and make the rest lowercase
-let formattedWords = words.map(word => {
-    if (word.length === 0) return '';
-    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-});
-
-// Join the words back together with a space and update the input value
-event.target.value = formattedWords.join(' ');
-});
 
 function createZoneRow(start = 0, stop = 0, el = 0) {
-const tr = document.createElement('tr');
-tr.innerHTML = `
-<td><input inputmode="decimal" value="${formatNumber(start)}"></td>
-<td><input inputmode="decimal" value="${formatNumber(stop)}"></td>
-<td><input inputmode="decimal" value="${formatNumber(el)}"></td>
-<td><button>X</button></td>
-`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+    <td><input type="number" step="0.1" value="${formatNumber(start)}"></td>
+    <td><input type="number" step="0.1" value="${formatNumber(stop)}"></td>
+    <td><input type="number" step="0.1" value="${formatNumber(el)}"></td>
+    <td><button aria-label="Remove zone">X</button></td>
+    `;
+    
+    const inputs = tr.querySelectorAll('input');
+    inputs.forEach(input => input.addEventListener('focus', event => event.target.select()));
 
-Array.from(tr.querySelectorAll('input')).forEach(inp => {
-inp.addEventListener('blur', () => {
-  inp.value = Math.min(Math.max(parseFloat(inp.value) || 0, 0), 360);
-  drawZones();
-});
-inp.addEventListener('input', drawZones);
-});
+    const changeHandler = () => {
+        validateZoneRow(tr);
+        drawZones();
+        updatePdfPreview();
+    };
 
-tr.querySelector('button').addEventListener('click', () => {
-tr.remove();
-drawZones();
-});
+    inputs.forEach(input => {
+        input.addEventListener('input', changeHandler);
+        input.addEventListener('blur', (e) => {
+            const max = e.target.parentElement.cellIndex < 2 ? 360 : 90;
+            e.target.value = formatNumber(Math.min(Math.max(parseFloat(e.target.value) || 0, 0), max));
+            changeHandler();
+        });
+    });
 
-zonesBody.appendChild(tr);
-drawZones();
+    tr.querySelector('button').addEventListener('click', () => {
+        tr.remove();
+        drawZones();
+        updatePdfPreview();
+    });
+
+    zonesBody.appendChild(tr);
+    changeHandler();
 }
 
 document.getElementById('addBlockBtn').addEventListener('click',()=>createZoneRow());
+
+// --------- Interactive Zone Creation -----------
+let isDrawing = false;
+let startAngle = 0;
+
+function getAngleFromPoint(x, y) {
+    const rect = overlayCanvas.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const angle = Math.atan2(y - cy, x - cx) * 180 / Math.PI + 90;
+    return (angle + 360) % 360;
+}
+
+vesselImg.addEventListener('mousedown', (e) => {
+    isDrawing = true;
+    startAngle = getAngleFromPoint(e.offsetX, e.offsetY);
+    document.body.style.cursor = 'crosshair';
+});
+
+vesselImg.addEventListener('mousemove', (e) => {
+    if (!isDrawing) return;
+    const currentAngle = getAngleFromPoint(e.offsetX, e.offsetY);
+    drawZones({ start: startAngle, stop: currentAngle, el: 20 });
+});
+
+vesselImg.addEventListener('mouseup', (e) => {
+    if (!isDrawing) return;
+    isDrawing = false;
+    document.body.style.cursor = 'default';
+    const stopAngle = getAngleFromPoint(e.offsetX, e.offsetY);
+    
+    // Avoid creating tiny zones on just a click
+    if (Math.abs(stopAngle - startAngle) > 2) {
+        createZoneRow(startAngle, stopAngle, 20); // Default EL of 20
+    } else {
+        drawZones(); // Clear temp zone
+    }
+});
+vesselImg.addEventListener('mouseleave', () => {
+    if(isDrawing) {
+        isDrawing = false;
+        document.body.style.cursor = 'default';
+        drawZones();
+    }
+});
+
 
 // --------- Drag & Drop 8 Photos -----------
 const dropArea=document.getElementById('drop-area');
@@ -294,46 +628,58 @@ dropArea.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation();});
 ["dragenter","dragover"].forEach(e=>dropArea.addEventListener(e,()=>dropArea.classList.add("highlight")));
 ["dragleave","drop"].forEach(e=>dropArea.addEventListener(e,()=>dropArea.classList.remove("highlight")));
 dropArea.addEventListener("drop",e=>handleFiles(e.dataTransfer.files));
-dropArea.addEventListener("click",()=>fileInput.click());
 fileInput.addEventListener("change",()=>handleFiles(fileInput.files));
 
-// Maps the sequential 0-7 index from the file drop/browse function 
-// to the desired cell ID index (1-9) in a clockwise order starting at cell-2.
-// The placement order is defined by the fixed cell IDs (1-9).
 const placementOrder=[2,3,6,9,8,7,4,1];
 
-/**
- * Handles processing of image files and placing them into a specific cell.
- * @param {File} file The image file.
- * @param {number} index The data-index of the cell where the image should be placed.
- */
-function processImage(file,index){
-    const reader=new FileReader();
-    reader.onload=e=>{
-        const img=new Image();
-        img.onload=()=>{
-            const canvas=document.createElement('canvas');
-            const ctx=canvas.getContext('2d');
-            const maxSize=600;
-            let {width,height}=img;
-            if(width>height){if(width>maxSize){height*=maxSize/width;width=maxSize;}}
-            else{if(height>maxSize){width*=maxSize/height;height=maxSize;}}
-            canvas.width=width; canvas.height=height; ctx.drawImage(img,0,0,width,height);
-            const compressed=canvas.toDataURL('image/jpeg',0.7);
-            const cell=document.getElementById(`cell-${index}`);
-            // Clearing innerHTML removes the number, image is then appended
-            cell.innerHTML=""; 
-            const imgEl=document.createElement('img'); 
-            imgEl.src=compressed; 
-            cell.appendChild(imgEl);
+function processImage(file, index) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const maxSize = 600;
+            let { width, height } = img;
+
+            if (width > height) { if (width > maxSize) { height *= maxSize / width; width = maxSize; } } 
+            else { if (height > maxSize) { width *= maxSize / height; height = maxSize; } }
+
+            canvas.width = width; canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+            const cell = document.getElementById(`cell-${index}`);
+            if (cell) {
+                cell.innerHTML = "";
+                const imgEl = document.createElement('img');
+                imgEl.src = compressedDataUrl;
+                imgEl.alt = `Photo for cell ${index}`;
+                cell.appendChild(imgEl);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-img-btn';
+                removeBtn.innerHTML = '&times;';
+                removeBtn.setAttribute('aria-label', `Remove image ${index}`);
+                removeBtn.onclick = (ev) => {
+                    ev.stopPropagation();
+                    const cellMap = { "1": "8", "2": "1", "3": "2", "4": "7", "6": "3", "7": "6", "8": "5", "9": "4" };
+                    cell.innerHTML = cellMap[cell.dataset.index] || '';
+                    updatePdfPreview();
+                };
+                cell.appendChild(removeBtn);
+                updatePdfPreview();
+            }
         };
-        img.src=e.target.result;
+        img.onerror = () => alert("Could not load image. Please try a different photo.");
+        img.src = e.target.result;
     };
+    reader.onerror = () => alert("Failed to read the selected file. Please try again.");
     reader.readAsDataURL(file);
 }
 
 function handleFiles(files){Array.from(files).slice(0,8).forEach((file,i)=>processImage(file,placementOrder[i]));}
-
 
 // --------- One-by-one photo selection -----------
 const singleFileElem = document.getElementById('singleFileElem');
@@ -348,341 +694,33 @@ singleFileElem.addEventListener('change', () => {
     if (singleFileElem.files.length > 0 && currentCellIndex) {
         processImage(singleFileElem.files[0], currentCellIndex);
     }
-    // Clear the file input value so selecting the same file works again
     singleFileElem.value = '';
 });
 
 function setupCellClickListeners() {
-    // We only attach listeners to the 8 surrounding cells
-    const cells = document.querySelectorAll('.cell:not(.center-cell)');
-    cells.forEach(cell => {
-        const index = cell.dataset.index;
-        // The original display number is stored in the initial innerHTML, which we fetch
-        // directly from the element defined in the HTML structure.
-        const initialNumber = cell.innerHTML.trim(); 
-        
-        // Check if there is already an event listener to avoid duplicates
-        cell.removeEventListener('click', handleCellClick); 
-        cell.addEventListener('click', handleCellClick);
-
-        function handleCellClick(event) {
-            // Check if the cell already has an image (i.e., innerHTML is empty or contains an <img>)
-            if (cell.querySelector('img')) {
-                // IMPORTANT: Using window.confirm() for replacement/removal logic
-                if (window.confirm("This cell already has a picture. Do you want to replace it? Click 'Cancel' to remove the image.")) {
-                    // User wants to replace, so open file picker
-                    openFilePickerForCell(index);
-                } else {
-                    // User wants to remove the image, so we re-add the original display number
-                    cell.innerHTML = initialNumber; // Re-add the clockwise number (1-8)
-                }
-            } else {
-                // No image, so open file picker to add one
-                openFilePickerForCell(index);
-            }
-        }
+    document.querySelectorAll('.cell:not(.center-cell)').forEach(cell => {
+        cell.addEventListener('click', () => {
+            openFilePickerForCell(cell.dataset.index);
+        });
     });
 }
-// -------------------------------------------------------------
-
 // --------- Remove All Images Function -----------
 function removeAllImages() {
-    const cells = document.querySelectorAll('.cell:not(.center-cell)');
-    cells.forEach(cell => {
-        // Re-read the initial number from the HTML element's current content 
-        // to handle the immediate re-addition of the number
-        const initialNumber = cell.innerHTML.trim();
-        // Clear all content and re-add the number
-        // Note: The number must be hardcoded in the HTML structure if we want to ensure
-        // the correct value is used here, but for simplicity, we use the original content if available.
-        // A safer implementation would use a map or read the original HTML.
-        
-        // Since the numbers are now set directly in the HTML based on the desired clockwise order (1-8),
-        // we can retrieve the correct number from the element's innerHTML immediately after DOM load.
-        // Let's use a reliable way to get the original number from the HTML structure.
-        
-        // Temporarily clear the cell and re-insert the number found in the original HTML.
-        // The most reliable way to get the *correct* clockwise number is to use a map.
-        const cellMap = {
-            "1": "8", "2": "1", "3": "2", // Top Row
-            "4": "7", "6": "3",            // Middle Row
-            "7": "6", "8": "5", "9": "4"   // Bottom Row
-        };
-        const fixedIndex = cell.dataset.index;
-        const clockwiseNumber = cellMap[fixedIndex] || '';
-
-        cell.innerHTML = clockwiseNumber;
+    document.querySelectorAll('.cell:not(.center-cell)').forEach(cell => {
+        const cellMap = { "1": "8", "2": "1", "3": "2", "4": "7", "6": "3", "7": "6", "8": "5", "9": "4" };
+        cell.innerHTML = cellMap[cell.dataset.index] || '';
     });
+    updatePdfPreview();
 }
-
 document.getElementById('removeAllImagesBtn').addEventListener('click', removeAllImages);
-// ------------------------------------------------
 
-// --------- PDF Generation (Merged + Fixed) -----------
+// --------- PDF Generation -----------
 document.getElementById('generatePdf').addEventListener('click', async()=>{
   try {
-    const pdfContainer = document.createElement('div');
-    pdfContainer.style.width = '720px';
-    pdfContainer.style.background = '#fff';
-    pdfContainer.style.padding = '10px';
-    pdfContainer.style.borderRadius = '8px';
-
-    const vesselNameVal = document.getElementById('vesselName').value.trim();
-    const antennaLocVal = document.getElementById('antennaLocation').value.trim();
-    const dateVal = document.getElementById('dateInput').value;
-    const submittedByVal = document.getElementById('submittedBy').value.trim(); // <-- Added
-
-if (vesselNameVal || antennaLocVal || dateVal || submittedByVal) {
-const infoDiv = document.createElement('div');
-infoDiv.style.display = 'flex';
-infoDiv.style.alignItems = 'center';
-infoDiv.style.justifyContent = 'center'; // <-- center the whole block
-infoDiv.style.marginBottom = '12px';
-
-// Logo
-const logoImg = document.createElement('img');
-logoImg.src = 'https://raw.githubusercontent.com/pgarciafer/blockChart/main/logo.png';
-logoImg.style.height = '50px'; // adjust as needed
-logoImg.style.marginRight = '12px';
-infoDiv.appendChild(logoImg);
-
-// Info texts
-const textDiv = document.createElement('div');
-textDiv.style.textAlign = 'left';
-if(vesselNameVal) textDiv.innerHTML += `<div><strong>Vessel:</strong> ${vesselNameVal}</div>`;
-if(antennaLocVal) textDiv.innerHTML += `<div><strong>Antenna & Location:</strong> ${antennaLocVal}</div>`;
-if(dateVal) textDiv.innerHTML += `<div><strong>Date:</strong> ${dateVal}</div>`;
-if(submittedByVal) textDiv.innerHTML += `<div><strong>Submitted by:</strong> ${submittedByVal}</div>`;
-
-infoDiv.appendChild(textDiv);
-pdfContainer.appendChild(infoDiv);
-}
-
-
-
-    const rows = Array.from(zonesBody.querySelectorAll('tr'));
-if (rows.length > 0) {
-  const gridCanvas = createBlockageGridCanvas();
-  const gridImg = document.createElement('img');
-  gridImg.src = gridCanvas.toDataURL('image/png');
-  gridImg.style.display = 'block';
-  gridImg.style.margin = '10px auto';
-  // ❌ REMOVE THIS LINE:
-  // gridImg.style.border = '1px solid #999';
-  pdfContainer.appendChild(gridImg);
-}
-
-function createBlockageGridCanvas() {
-  const cols = 72; // 5° per column
-  const rows = 18; // 5° per row
-  const cellSize = 9; // smaller for PDF
-  const margin = 20;  // smaller margin
-
-  const width = cols * cellSize + margin * 2;
-  const height = rows * cellSize + margin * 2;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.translate(margin, height - margin); // origin at bottom-left
-
-  // --- Draw X and Y axes ---
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 1;
-
-  // Y-Axis
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(0, -rows * cellSize);
-  ctx.stroke();
-
-  // X-Axis
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(cols * cellSize, 0);
-  ctx.stroke();
-  // ---------------------------
-
-  // Draw internal gridlines only
-  ctx.strokeStyle = '#ddd';
-  ctx.lineWidth = 0.5;
-
-  for (let c = 1; c < cols; c++) {
-    const x = c * cellSize;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, -rows * cellSize);
-    ctx.stroke();
-  }
-  for (let r = 1; r < rows; r++) {
-    const y = -r * cellSize;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(cols * cellSize, y);
-    ctx.stroke();
-  }
-
-  // Fill blockage zones
-  const zoneRows = Array.from(zonesBody.querySelectorAll('tr'));
-  ctx.fillStyle = 'rgba(128,128,128,0.7)';
-  zoneRows.forEach(row => {
-    const azStart = parseFloat(row.cells[0].querySelector('input').value) || 0;
-    const azStop  = parseFloat(row.cells[1].querySelector('input').value) || 0;
-    const el      = parseFloat(row.cells[2].querySelector('input').value) || 0;
-    const elClamped = Math.min(Math.max(el, 0), 90);
-    const rowTop = Math.floor((elClamped / 90) * rows);
-
-    const normalizeAz = az => (az < 180 ? 36 + Math.floor(az/5) : Math.floor((az-180)/5));
-    const cStart = normalizeAz(azStart);
-    const cStop  = normalizeAz(azStop);
-
-    const fillCell = (c,r) => ctx.fillRect(c*cellSize, -r*cellSize - cellSize, cellSize, cellSize);
-
-    if(cStart <= cStop){
-      for(let c=cStart;c<=cStop;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
-    } else {
-      for(let c=cStart;c<cols;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
-      for(let c=0;c<=cStop;c++) for(let r=0;r<=rowTop;r++) fillCell(c,r);
-    }
-  });
-
-  // Draw only small ticks for axes, not full lines
-  ctx.fillStyle = '#000';
-  ctx.font = '8px sans-serif';
-
-  // X-axis ticks every 10°
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  for (let az = 180; az <= 540; az += 10) {
-    let colIndex = az <= 360 ? (az - 180) / 5 : (az - 540) / 5 + 72;
-    const x = colIndex * cellSize;
-    if (x < 0 || x > cols * cellSize) continue;
-
-    // draw tick line
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, 3);
-    ctx.stroke();
-
-    // rotate text
-    ctx.save();
-    ctx.translate(x, 6);
-    ctx.rotate(-Math.PI / 4);
-    ctx.fillText((az % 360).toString(), 0, 0);
-    ctx.restore();
-  }
-
-  // Y-axis ticks every 5°
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  for(let el=0; el<=90; el+=5){
-    const y = -(el/90)*rows*cellSize;
-    ctx.beginPath();
-    ctx.moveTo(-3,y); ctx.lineTo(0,y); ctx.stroke();
-    // Adjusted position for text separation
-    ctx.fillText(el.toString(), -8, y);
-  }
-
-  return canvas;
-}
-
-
-async function createVesselCanvasForPDF() {
-const img = new Image();
-img.crossOrigin = "anonymous";
-img.src = vesselImg.src;
-await new Promise(resolve => img.onload = resolve);
-
-// Get the natural dimensions of the vessel image
-const width = img.naturalWidth;
-const height = img.naturalHeight;
-
-// Canvas size = same as vessel image
-const canvas = document.createElement('canvas');
-canvas.width = width;
-canvas.height = height;
-const ctx = canvas.getContext('2d');
-
-// Draw the vessel image at natural size
-ctx.drawImage(img, 0, 0, width, height);
-
-// Draw circular block zones on a square overlay
-const size = Math.min(width, height);
-const cx = size / 2;
-const cy = size / 2;
-const R = size * 0.42;
-
-Array.from(zonesBody.querySelectorAll('tr')).forEach(row => {
-const start = parseFloat(row.cells[0].querySelector('input').value);
-const stop = parseFloat(row.cells[1].querySelector('input').value);
-const el = parseFloat(row.cells[2].querySelector('input').value);
-if (isNaN(start) || isNaN(stop)) return;
-
-const startRad = (start - 90) * Math.PI / 180;
-const stopRad = (stop - 90) * Math.PI / 180;
-const elClamped = Math.min(Math.max(el, 0), 90);
-const opacity = 0.2 + (elClamped / 90) * 0.6;
-
-ctx.save();
-ctx.shadowColor = 'rgba(0,0,0,0.3)';
-ctx.shadowBlur = 8;
-ctx.shadowOffsetX = 0;
-ctx.shadowOffsetY = 0;
-
-ctx.beginPath();
-ctx.moveTo(cx, cy);
-ctx.arc(cx, cy, R, startRad, stopRad, false);
-ctx.closePath();
-ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
-ctx.fill();
-ctx.restore();
-
-// Optional EL label
-let midAngle = (stop < start)
-  ? ((start - 90) * Math.PI / 180 + (stop + 360 - 90) * Math.PI / 180) / 2
-  : (startRad + stopRad) / 2;
-const labelX = cx + Math.cos(midAngle) * R * 0.7;
-const labelY = cy + Math.sin(midAngle) * R * 0.7;
-ctx.fillStyle = 'black';
-ctx.font = '12px sans-serif';
-ctx.textAlign = 'center';
-ctx.textBaseline = 'middle';
-ctx.fillText(`${Math.round(el)}°`, labelX, labelY);
-});
-
-return canvas;
-}
-
-    const gridClone = document.getElementById('grid').cloneNode(true);
-    const centerCellClone = gridClone.querySelector('#cell-5');
-    centerCellClone.innerHTML = '';
-    const vesselCanvas = await createVesselCanvasForPDF();
-    const imgEl = document.createElement('img');
-    imgEl.src = vesselCanvas.toDataURL('image/png');
-    centerCellClone.appendChild(imgEl);
-
-    pdfContainer.appendChild(gridClone);
-
-    document.body.appendChild(pdfContainer);
+    const pdfContent = await buildPdfContent(false);
+    document.body.appendChild(pdfContent);
     
-    const canvas = await html2canvas(pdfContainer, {
-    scale: 2,
-    useCORS: true,
-    // Attempt to explicitly handle shadows
-    // This may not work on all devices but is a good practice to try
-    ignoreElements: (element) => {
-        // You can add logic here to ignore elements that are causing issues
-        return false; // return true to ignore, false to render
-    },
-    onrendered: function(canvas) {
-        // You can inspect the rendered canvas here
-    }
-});
+    const canvas = await html2canvas(pdfContent, { scale: 2, useCORS: true });
     
     const imgData = canvas.toDataURL('image/jpeg',0.95);
     const {jsPDF} = window.jspdf;
@@ -693,59 +731,182 @@ return canvas;
     const imgHeight = (canvas.height*imgWidth)/canvas.width;
     const posY = (pageHeight - imgHeight)/2;
     pdf.addImage(imgData,'JPEG',0,posY,imgWidth,imgHeight);
-    // Get input values and sanitize them for filename
 
-    const cleanDate = dateVal.replace(/-/g,''); // <-- added
-    const fileName = `${vesselNameVal}_BlockageChart_${antennaLocVal}_${cleanDate}.pdf`
-      .replace(/[\/\\?%*:|"<>]/g, '_');
+    const vesselNameVal = document.getElementById('vesselName').value.trim();
+    const antennaLocVal = document.getElementById('antennaLocation').value.trim();
+    const dateVal = document.getElementById('dateInput').value.replace(/-/g,'');
+    const fileName = `${vesselNameVal}_BlockageChart_${antennaLocVal}_${dateVal}.pdf`.replace(/[\/\\?%*:|"<>]/g, '_');
 
-pdf.save(fileName);
-
-    pdfContainer.remove();
+    pdf.save(fileName);
+    pdfContent.remove();
   } catch(err) {
     console.error("PDF generation failed:", err);
-    // IMPORTANT: Replaced alert with custom modal/confirmation behavior for compatibility
-    if (window.confirm("PDF generation failed. Check console for details. Click OK to view the error in the console.")) {
-        // The console.error call above should log the details.
-    }
+    alert("PDF generation failed. Check console for details.");
   }
+});
+
+// --------- Live PDF Preview -----------
+async function buildPdfContent(isForPreview) {
+    const container = document.createElement('div');
+    if (isForPreview) {
+        container.style.transform = 'scale(0.95)';
+        container.style.transformOrigin = 'top left';
+    } else {
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.width = '720px';
+        container.style.background = '#fff';
+        container.style.padding = '10px';
+        container.style.borderRadius = '8px';
+    }
+
+    const vesselNameVal = document.getElementById('vesselName').value.trim();
+    const antennaLocVal = document.getElementById('antennaLocation').value.trim();
+    const dateVal = document.getElementById('dateInput').value;
+    const submittedByVal = document.getElementById('submittedBy').value.trim();
+
+    if (vesselNameVal || antennaLocVal || dateVal || submittedByVal) {
+        const infoDiv = document.createElement('div');
+        infoDiv.style.cssText = 'display:flex; align-items:center; justify-content:center; margin-bottom:12px;';
+        infoDiv.innerHTML = `
+            <img src="https://raw.githubusercontent.com/pgarciafer/MTNblockagechart/main/logo.png" style="height:50px; margin-right:12px;">
+            <div style="text-align:left;">
+                ${vesselNameVal ? `<div><strong>Vessel:</strong> ${vesselNameVal}</div>` : ''}
+                ${antennaLocVal ? `<div><strong>Antenna & Location:</strong> ${antennaLocVal}</div>` : ''}
+                ${dateVal ? `<div><strong>Date:</strong> ${dateVal}</div>` : ''}
+                ${submittedByVal ? `<div><strong>Submitted by:</strong> ${submittedByVal}</div>` : ''}
+            </div>`;
+        container.appendChild(infoDiv);
+    }
+    
+    // Simplified vessel image with zones for preview
+    const gridClone = document.getElementById('grid').cloneNode(true);
+    const centerCellClone = gridClone.querySelector('#cell-5');
+    const overlayClone = overlayCanvas.cloneNode(true);
+    const overlayCloneCtx = overlayClone.getContext('2d');
+    overlayClone.width = overlayCanvas.width;
+    overlayClone.height = overlayCanvas.height;
+    overlayCloneCtx.drawImage(overlayCanvas, 0, 0);
+
+    centerCellClone.querySelector('#vesselImage').appendChild(overlayClone);
+
+    // Remove remove buttons from clone
+    gridClone.querySelectorAll('.remove-img-btn').forEach(btn => btn.remove());
+    container.appendChild(gridClone);
+
+    return container;
+}
+
+
+let previewTimeout;
+async function updatePdfPreview() {
+    clearTimeout(previewTimeout);
+    previewTimeout = setTimeout(async () => {
+        const previewContainer = document.getElementById('pdf-preview-content');
+        previewContainer.innerHTML = 'Updating...';
+        const content = await buildPdfContent(true);
+        previewContainer.innerHTML = '';
+        previewContainer.appendChild(content);
+    }, 300); // Debounce updates
+}
+
+
+// --------- Input Formatting & Event Listeners -----------
+document.querySelectorAll('.header-inputs input').forEach(input => {
+    input.addEventListener('focus', event => event.target.select());
+    input.addEventListener('input', updatePdfPreview);
 });
 
 document.getElementById('vesselName').addEventListener('change', (event) => {
     let value = event.target.value.trim();
-
-    // Regular expression to match 3 capital letters
     const prefixRegex = /^[A-Z]{3}_/;
     let prefix = '';
     let namePart = value;
 
-    // Check if the input already has the "ABC_" prefix
     if (prefixRegex.test(value)) {
-        // If it does, extract the prefix and the rest of the name
         prefix = value.substring(0, 4);
         namePart = value.substring(4);
     } else if (value.length >= 3) {
-        // If not, assume the first 3 characters are the prefix
         prefix = value.substring(0, 3).toUpperCase() + '_';
         namePart = value.substring(3);
     }
-
-    // Split the name part into words
     let words = namePart.split(/\s+/);
-    let formattedWords = words.map(word => {
-        if (word.length === 0) return '';
-        // Capitalize the first letter and make the rest lowercase
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    });
-
-    // Join the words **without** spaces and set the formatted value
-    event.target.value = prefix + formattedWords.join(''); // Changed from .join(' ') to .join('')
+    let formattedWords = words.map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+    event.target.value = prefix + formattedWords.join('');
 });
 
+document.getElementById('antennaLocation').addEventListener('input', (event) => {
+    event.target.value = event.target.value.toUpperCase();
+});
+
+document.getElementById('submittedBy').addEventListener('change', (event) => {
+    let value = event.target.value.trim();
+    let words = value.split(/\s+/);
+    let formattedWords = words.map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+    event.target.value = formattedWords.join(' ');
+});
+
+// --------- Voice Input -----------
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition;
+if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    let targetInput = null;
+
+    document.querySelectorAll('.mic-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            if (recognition.isListening) {
+                recognition.stop();
+                return;
+            }
+            targetInput = document.getElementById(button.dataset.target);
+            recognition.start();
+            document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('is-listening'));
+            button.classList.add('is-listening');
+        });
+    });
+
+    recognition.onresult = (event) => {
+        const speechResult = event.results[0][0].transcript;
+        if (targetInput) {
+            targetInput.value = speechResult;
+            targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+            targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        if(event.error === 'not-allowed' || event.error === 'service-not-allowed'){
+            alert('Microphone access denied. Please allow microphone access in your browser settings to use this feature.');
+        }
+    };
+    
+    recognition.onend = () => {
+        recognition.isListening = false;
+        document.querySelectorAll('.mic-btn').forEach(b => b.classList.remove('is-listening'));
+    };
+    
+    recognition.onstart = () => {
+        recognition.isListening = true;
+    }
+
+} else {
+    document.querySelectorAll('.mic-btn').forEach(button => button.style.display = 'none');
+}
+
+// --------- Initial Setup -----------
 window.addEventListener('resize', resizeOverlay);
 window.addEventListener('DOMContentLoaded',() => {
     resizeOverlay();
-    setupCellClickListeners(); // Call the function to set up click listeners on all cells
+    setupCellClickListeners();
+    updatePdfPreview();
 });
 </script>
 </body>
